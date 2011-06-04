@@ -86,6 +86,15 @@ func TestQuotedLine(t *testing.T) {
 	checkEquals(t, expected, values)
 }
 
+func TestEscapedQuoteLine(t *testing.T) {
+	r:= makeReader("\"a\",b,\"c\"\"d\"", true)
+	values, e := r.ReadRow()
+	checkNoError(t, e)
+	checkValueCount(t, 3, values)
+	expected := [][]byte{[]byte("a"), []byte("b"), []byte("c\"d")}
+	checkEquals(t, expected, values)
+}
+
 func BenchmarkParsing(b *testing.B) {
 	benchmarkParsing(b, "aaaaaaaa,b b b b b b b,cc cc cc cc cc, ddddd ddd\n", false)
 }

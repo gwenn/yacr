@@ -57,6 +57,7 @@ func (r *Reader) scanLine(line []byte) ([][]byte, bool) {
 			if quotedChunk {
 				if i < (len(line)-1) && line[i+1] == '"' {
 					escapedQuotes += 1
+					i++
 				} else {
 					quotedChunk = false
 					endQuotedChunk = i
