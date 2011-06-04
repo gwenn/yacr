@@ -78,7 +78,7 @@ func TestLongLine(t *testing.T) {
 }
 
 func TestQuotedLine(t *testing.T) {
-	r:= makeReader("\"a\",b,\"c,d\"", true)
+	r := makeReader("\"a\",b,\"c,d\"", true)
 	values, e := r.ReadRow()
 	checkNoError(t, e)
 	checkValueCount(t, 3, values)
@@ -87,7 +87,7 @@ func TestQuotedLine(t *testing.T) {
 }
 
 func TestEscapedQuoteLine(t *testing.T) {
-	r:= makeReader("\"a\",b,\"c\"\"d\"", true)
+	r := makeReader("\"a\",b,\"c\"\"d\"", true)
 	values, e := r.ReadRow()
 	checkNoError(t, e)
 	checkValueCount(t, 3, values)
