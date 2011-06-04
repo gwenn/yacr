@@ -10,7 +10,7 @@ import (
 
 type Reader struct {
 	sep    byte
-	quotes bool
+	quoted bool
 	//trim	bool
 	b      *bufio.Reader
 	buf    []byte
@@ -20,18 +20,14 @@ type Reader struct {
 func DefaultReader(rd io.Reader) *Reader {
 	return NewReader(rd, ',', true)
 }
-func NewReaderBytes(b []byte, sep byte, quotes bool) *Reader {
-	return NewReader(bytes.NewBuffer(b), sep, quotes)
+func NewReaderBytes(b []byte, sep byte, quoted bool) *Reader {
+	return NewReader(bytes.NewBuffer(b), sep, quoted)
 }
-func NewReaderString(s string, sep byte, quotes bool) *Reader {
-	return NewReader(strings.NewReader(s), sep, quotes)
+func NewReaderString(s string, sep byte, quoted bool) *Reader {
+	return NewReader(strings.NewReader(s), sep, quoted)
 }
-func NewReader(rd io.Reader, sep byte, quotes bool) *Reader {
-	// TODO
-	if quotes {
-		panic("Quoted mode not supported yet")
-	}
-	return &Reader{sep: sep, quotes: quotes, b: bufio.NewReader(rd), values: make([][]byte, 20)}
+func NewReader(rd io.Reader, sep byte, quoted bool) *Reader {
+	return &Reader{sep: sep, quoted: quoted, b: bufio.NewReader(rd), values: make([][]byte, 20)}
 }
 
 func (r *Reader) ReadRow() ([][]byte, os.Error) {
@@ -39,7 +35,67 @@ func (r *Reader) ReadRow() ([][]byte, os.Error) {
 	if err != nil {
 		return nil, err
 	}
+	if r.quoted {
+		values, isPrefix := r.scanLine(line)
+		if isPrefix {
+			panic("Embedded new line not supported yet")
+		}
+		return values, nil
+	}
 	return r.split(line), nil
+}
+
+func (r *Reader) scanLine(line []byte) ([][]byte, bool) {
+	start := 0
+	a := r.values[0:0]
+	quotedChunk := false
+	endQuotedChunk := 0
+	escapedQuotes := 0
+	for i := 0; i < len(line); i++ {
+		if line[i] == '"' {
+			if quotedChunk {
+				if i < (len(line)-1) && line[i+1] == '"' {
+					escapedQuotes += 1
+				} else {
+					quotedChunk = false
+					endQuotedChunk = i
+				}
+			} else if i == 0 || line[i-1] == r.sep {
+				quotedChunk = true
+				start = i + 1
+			}
+		} else if line[i] == r.sep && !quotedChunk {
+			if endQuotedChunk != 0 {
+				a = append(a, unescapeQuotes(line[start:endQuotedChunk], escapedQuotes))
+				escapedQuotes = 0
+				endQuotedChunk = 0
+			} else {
+				a = append(a, line[start:i])
+			}
+			start = i + 1
+		}
+	}
+	if endQuotedChunk != 0 {
+		a = append(a, unescapeQuotes(line[start:endQuotedChunk], escapedQuotes))
+	} else {
+		a = append(a, unescapeQuotes(line[start:], escapedQuotes))
+	}
+	r.values = a // if cap(a) != cap(r.values)
+	return a, quotedChunk
+}
+
+func unescapeQuotes(b []byte, count int) []byte {
+	if count == 0 {
+		return b
+	}
+	c := make([]byte, len(b)-count)
+	for i, j := 0, 0; i < len(b); i, j = i+1, j+1 {
+		c[j] = b[i]
+		if b[i] == '"' {
+			i++
+		}
+	}
+	return c
 }
 
 func (r *Reader) readLine() ([]byte, os.Error) {
@@ -79,7 +135,7 @@ func (r *Reader) split(line []byte) [][]byte {
 
 type Writer struct {
 	sep    byte
-	quotes bool
+	quoted bool
 	//trim	bool
 	b *bufio.Writer
 }
@@ -87,12 +143,12 @@ type Writer struct {
 func DefaultWriter(wr io.Writer) *Writer {
 	return NewWriter(wr, ',', true)
 }
-func NewWriter(wr io.Writer, sep byte, quotes bool) *Writer {
+func NewWriter(wr io.Writer, sep byte, quoted bool) *Writer {
 	// TODO
-	if quotes {
+	if quoted {
 		panic("Quoted mode not supported yet")
 	}
-	return &Writer{sep: sep, quotes: quotes, b: bufio.NewWriter(wr)}
+	return &Writer{sep: sep, quoted: quoted, b: bufio.NewWriter(wr)}
 }
 
 func (w *Writer) WriteRow(row [][]byte) (err os.Error) {

@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-func makeReader(s string) *Reader {
-	return NewReaderString(s, ',', false)
+func makeReader(s string, quoted bool) *Reader {
+	return NewReaderString(s, ',', quoted)
 }
 
 func checkValueCount(t *testing.T, expected int, values [][]byte) {
@@ -23,8 +23,14 @@ func checkNoError(t *testing.T, e os.Error) {
 	}
 }
 
+func checkEquals(t *testing.T, expected, actual [][]byte) {
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("Expected %#v, got %#v", expected, actual)
+	}
+}
+
 func TestSingleValue(t *testing.T) {
-	r := makeReader("Foo")
+	r := makeReader("Foo", true)
 	values, e := r.ReadRow()
 	checkNoError(t, e)
 	checkValueCount(t, 1, values)
@@ -41,21 +47,19 @@ func TestSingleValue(t *testing.T) {
 }
 
 func TestTwoValues(t *testing.T) {
-	r := makeReader("Foo,Bar")
+	r := makeReader("Foo,Bar", true)
 	values, e := r.ReadRow()
 	checkNoError(t, e)
 	checkValueCount(t, 2, values)
 	expected := [][]byte{[]byte("Foo"), []byte("Bar")}
-	if !reflect.DeepEqual(expected, values) {
-		t.Errorf("Expected %#v, got %#v", expected, values)
-	}
+	checkEquals(t, expected, values)
 }
 
 func TestTwoLines(t *testing.T) {
 	row1 := strings.Repeat("1,2,3,4,5,6,7,8,9,10,", 5)
 	row2 := strings.Repeat("a,b,c,d,e,f,g,h,i,j,", 3)
 	content := strings.Join([]string{row1, row2}, "\n")
-	r := makeReader(content)
+	r := makeReader(content, true)
 	values, e := r.ReadRow()
 	checkNoError(t, e)
 	checkValueCount(t, 51, values)
@@ -66,19 +70,35 @@ func TestTwoLines(t *testing.T) {
 
 func TestLongLine(t *testing.T) {
 	content := strings.Repeat("1,2,3,4,5,6,7,8,9,10,", 200)
-	r := makeReader(content)
+	r := makeReader(content, true)
 	values, e := r.ReadRow()
 	checkNoError(t, e)
 	checkValueCount(t, 2001, values)
 }
 
+func TestQuotedLine(t *testing.T) {
+	r:= makeReader("\"a\",b,\"c,d\"", true)
+	values, e := r.ReadRow()
+	checkNoError(t, e)
+	checkValueCount(t, 3, values)
+	expected := [][]byte{[]byte("a"), []byte("b"), []byte("c,d")}
+	checkEquals(t, expected, values)
+}
+
 func BenchmarkParsing(b *testing.B) {
+	benchmarkParsing(b, "aaaaaaaa,b b b b b b b,cc cc cc cc cc, ddddd ddd\n", false)
+}
+func BenchmarkQuotedParsing(b *testing.B) {
+	benchmarkParsing(b, "aaaaaaaa,b b b b b b b,\"cc cc cc,cc\",cc, ddddd ddd\n", true)
+}
+
+func benchmarkParsing(b *testing.B, s string, quoted bool) {
 	b.StopTimer()
-	str := strings.Repeat("aaaaaaaa,b b b b b b b,cc cc cc cc cc, ddddd ddd\n", 2000)
+	str := strings.Repeat(s, 2000)
 	b.SetBytes(int64(len(str)))
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		r := makeReader(str)
+		r := makeReader(str, quoted)
 		nb := 0
 		for {
 			_, e := r.ReadRow()
