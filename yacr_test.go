@@ -8,7 +8,7 @@ import (
 )
 
 func makeReader(s string) *Reader {
-	return NewReader(strings.NewReader(s), ',', false)
+	return NewReaderString(s, ',', false)
 }
 
 func checkValueCount(t *testing.T, expected int, values [][]byte) {

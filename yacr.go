@@ -2,8 +2,10 @@ package yacr
 
 import (
 	"bufio"
+	"bytes"
 	"io"
 	"os"
+	"strings"
 )
 
 type Reader struct {
@@ -17,6 +19,12 @@ type Reader struct {
 
 func DefaultReader(rd io.Reader) *Reader {
 	return NewReader(rd, ',', true)
+}
+func NewReaderBytes(b []byte, sep byte, quotes bool) *Reader {
+	return NewReader(bytes.NewBuffer(b), sep, quotes)
+}
+func NewReaderString(s string, sep byte, quotes bool) *Reader {
+	return NewReader(strings.NewReader(s), sep, quotes)
 }
 func NewReader(rd io.Reader, sep byte, quotes bool) *Reader {
 	// TODO
@@ -43,12 +51,10 @@ func (r *Reader) readLine() ([]byte, os.Error) {
 		if err != nil {
 			return nil, err
 		}
-		if !isPrefix {
-			if buf == nil {
+		if buf == nil {
+			if !isPrefix {
 				return line, nil
 			}
-		}
-		if buf == nil {
 			buf = r.buf[0:0]
 		}
 		buf = append(buf, line...)
@@ -75,7 +81,7 @@ type Writer struct {
 	sep    byte
 	quotes bool
 	//trim	bool
-	b      *bufio.Writer
+	b *bufio.Writer
 }
 
 func DefaultWriter(wr io.Writer) *Writer {
@@ -107,6 +113,10 @@ func (w *Writer) WriteRow(row [][]byte) (err os.Error) {
 		return
 	}
 	return
+}
+
+func (w *Writer) Flush() os.Error {
+	return w.b.Flush()
 }
 
 func (w *Writer) write(value []byte) (err os.Error) {
