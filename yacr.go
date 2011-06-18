@@ -37,21 +37,33 @@ func (r *Reader) ReadRow() ([][]byte, os.Error) {
 		return nil, err
 	}
 	if r.quoted {
-		values, isPrefix := r.scanLine(line)
-		if isPrefix {
-			panic("Embedded new line not supported yet")
+		start := 0
+		values, isPrefix := r.scanLine(line, false)
+		for isPrefix {
+			start = deepCopy(values, start)
+			line, err := r.readLine()
+			if err != nil {
+				return nil, err
+			}
+			values, isPrefix = r.scanLine(line, true)
 		}
 		return values, nil
 	}
 	return r.split(line), nil
 }
 
-func (r *Reader) scanLine(line []byte) ([][]byte, bool) {
+func (r *Reader) scanLine(line []byte, continuation bool) ([][]byte, bool) {
 	start := 0
-	a := r.values[0:0]
-	quotedChunk := false
-	endQuotedChunk := 0
+	var a [][]byte
+	if continuation {
+		a = r.values
+	} else {
+		a = r.values[0:0]
+	}
+	quotedChunk := continuation
+	endQuotedChunk := -1
 	escapedQuotes := 0
+	var chunk []byte
 	for i := 0; i < len(line); i++ {
 		if line[i] == '"' {
 			if quotedChunk {
@@ -67,20 +79,31 @@ func (r *Reader) scanLine(line []byte) ([][]byte, bool) {
 				start = i + 1
 			}
 		} else if line[i] == r.sep && !quotedChunk {
-			if endQuotedChunk != 0 {
-				a = append(a, unescapeQuotes(line[start:endQuotedChunk], escapedQuotes))
+			if endQuotedChunk >= 0 {
+				chunk = unescapeQuotes(line[start:endQuotedChunk], escapedQuotes)
 				escapedQuotes = 0
-				endQuotedChunk = 0
+				endQuotedChunk = -1
 			} else {
-				a = append(a, line[start:i])
+				chunk = line[start:i]
+			}
+			if continuation {
+				fixLastChunk(a, chunk)
+				continuation = false
+			} else {
+				a = append(a, chunk)
 			}
 			start = i + 1
 		}
 	}
-	if endQuotedChunk != 0 {
-		a = append(a, unescapeQuotes(line[start:endQuotedChunk], escapedQuotes))
+	if endQuotedChunk >= 0 {
+		chunk = unescapeQuotes(line[start:endQuotedChunk], escapedQuotes)
 	} else {
-		a = append(a, unescapeQuotes(line[start:], escapedQuotes))
+		chunk = unescapeQuotes(line[start:], escapedQuotes)
+	}
+	if continuation {
+		fixLastChunk(a, chunk)
+	} else {
+		a = append(a, chunk)
 	}
 	r.values = a // if cap(a) != cap(r.values)
 	return a, quotedChunk
@@ -98,6 +121,13 @@ func unescapeQuotes(b []byte, count int) []byte {
 		}
 	}
 	return c
+}
+
+func fixLastChunk(values [][]byte, continuation []byte) {
+	prefix := values[len(values) -1]
+	prefix = append(prefix, '\n') // TODO \r\n ?
+	prefix = append(prefix, continuation...)
+	values[len(values) -1] = prefix
 }
 
 func (r *Reader) readLine() ([]byte, os.Error) {
@@ -216,4 +246,14 @@ func (w *Writer) write(value []byte) (err os.Error) {
 		_, err = w.b.Write(value)
 	}
 	return
+}
+
+func deepCopy(row [][]byte, start int) int {
+	var dup []byte
+	for i := start; i < len(row); i++ {
+		dup = make([]byte, len(row[i]))
+		copy(dup, row[i])
+		row[i] = dup
+	}
+	return len(row)
 }

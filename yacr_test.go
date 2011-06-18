@@ -96,6 +96,15 @@ func TestEscapedQuoteLine(t *testing.T) {
 	checkEquals(t, expected, values)
 }
 
+func TestEmbeddedNewline(t *testing.T) {
+	r := makeReader("a,\"b\nb\",\"c\n\n\",d", true)
+	values, e := r.ReadRow()
+	checkNoError(t, e)
+	checkValueCount(t, 4, values)
+	expected := [][]byte{[]byte("a"), []byte("b\nb"), []byte("c\n\n"), []byte("d")}
+	checkEquals(t, expected, values)
+}
+
 func TestWriter(t *testing.T) {
 	out := bytes.NewBuffer(nil)
 	w := DefaultWriter(out)
@@ -115,6 +124,9 @@ func BenchmarkParsing(b *testing.B) {
 }
 func BenchmarkQuotedParsing(b *testing.B) {
 	benchmarkParsing(b, "aaaaaaaa,b b b b b b b,\"cc cc cc,cc\",cc, ddddd ddd\n", true)
+}
+func BenchmarkEmbeddedNewline(b *testing.B) {
+	benchmarkParsing(b, "aaaaaaaa,b b b b b b b,\"fo \n oo\",\"c oh c yes c \", ddddd ddd\n", true)
 }
 
 func benchmarkParsing(b *testing.B, s string, quoted bool) {
