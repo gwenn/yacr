@@ -146,10 +146,6 @@ func DefaultWriter(wr io.Writer) *Writer {
 	return NewWriter(wr, ',', true)
 }
 func NewWriter(wr io.Writer, sep byte, quoted bool) *Writer {
-	// TODO
-	if quoted {
-		panic("Quoted mode not supported yet")
-	}
 	return &Writer{sep: sep, quoted: quoted, b: bufio.NewWriter(wr)}
 }
 
@@ -166,7 +162,7 @@ func (w *Writer) WriteRow(row [][]byte) (err os.Error) {
 			return
 		}
 	}
-	err = w.b.WriteByte('\n')
+	err = w.b.WriteByte('\n') // TODO \r\n ?
 	if err != nil {
 		return
 	}
@@ -178,6 +174,46 @@ func (w *Writer) Flush() os.Error {
 }
 
 func (w *Writer) write(value []byte) (err os.Error) {
-	_, err = w.b.Write(value)
+	// In quoted mode, value is enclosed between quotes if it contains sep, quote or \n.
+	if w.quoted {
+		last := 0
+		for i, c := range value {
+			switch c {
+			case '"', '\n', w.sep:
+			default:
+				continue
+			}
+			if last == 0 {
+				err = w.b.WriteByte('"')
+				if err != nil {
+					return
+				}
+			}
+			_, err = w.b.Write(value[last:i])
+			if err != nil {
+				return
+			}
+			err = w.b.WriteByte(c)
+			if err != nil {
+				return
+			}
+			if c == '"' {
+				err = w.b.WriteByte(c)
+				if err != nil {
+					return
+				}
+			}
+			last = i + 1
+		}
+		_, err = w.b.Write(value[last:])
+		if err != nil {
+			return
+		}
+		if last != 0 {
+			err = w.b.WriteByte('"')
+		}
+	} else {
+		_, err = w.b.Write(value)
+	}
 	return
 }

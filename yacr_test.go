@@ -2,6 +2,7 @@
 package yacr
 
 import (
+	"bytes"
 	"os"
 	"reflect"
 	"strings"
@@ -93,6 +94,20 @@ func TestEscapedQuoteLine(t *testing.T) {
 	checkValueCount(t, 3, values)
 	expected := [][]byte{[]byte("a"), []byte("b"), []byte("c\"d")}
 	checkEquals(t, expected, values)
+}
+
+func TestWriter(t *testing.T) {
+	out := bytes.NewBuffer(nil)
+	w := DefaultWriter(out)
+	e := w.WriteRow([][]byte{[]byte("a"), []byte("b,\n"), []byte("c\"d")})
+	checkNoError(t, e)
+	e = w.Flush()
+	checkNoError(t, e)
+	expected := "a,\"b,\n\",\"c\"\"d\"\n"
+	line := out.String()
+	if expected != line {
+		t.Errorf("Expected '%s', got '%s'", expected, line)
+	}
 }
 
 func BenchmarkParsing(b *testing.B) {
