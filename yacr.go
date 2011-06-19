@@ -4,8 +4,10 @@ package yacr
 import (
 	"bufio"
 	"bytes"
+	"compress/bzip2"
 	"compress/gzip"
 	"io"
+	"io/ioutil"
 	"os"
 	"path"
 	"strings"
@@ -279,6 +281,15 @@ func deepCopy(row [][]byte, start int) int {
 	return len(row)
 }
 
+func DeepCopy(row [][]byte) [][]byte {
+	dup := make([][]byte, len(row))
+	for i := 0; i < len(row); i++ {
+		dup[i] = make([]byte, len(row[i]))
+		copy(dup[i], row[i])
+	}
+	return dup
+}
+
 type zReadCloser struct {
 	f  *os.File
 	rd io.ReadCloser
@@ -292,11 +303,14 @@ func zopen(filepath string) (io.ReadCloser, os.Error) {
 	}
 	var rd io.ReadCloser
 	// TODO zip, bz2
-	if path.Ext(f.Name()) == ".gz" {
+	ext := path.Ext(f.Name())
+	if ext == ".gz" {
 		rd, err = gzip.NewReader(f)
 		if err != nil {
 			return nil, err
 		}
+	} else if ext == ".bz2" {
+		rd = ioutil.NopCloser(bzip2.NewReader(f))
 	} else {
 		rd = f
 	}
