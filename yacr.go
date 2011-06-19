@@ -4,8 +4,10 @@ package yacr
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"io"
 	"os"
+	"path"
 	"strings"
 )
 
@@ -14,12 +16,16 @@ type Reader struct {
 	quoted bool
 	//trim	bool
 	b      *bufio.Reader
+	rd     io.Reader
 	buf    []byte
 	values [][]byte
 }
 
 func DefaultReader(rd io.Reader) *Reader {
 	return NewReader(rd, ',', true)
+}
+func DefaultFileReader(filepath string) (*Reader, os.Error) {
+	return NewFileReader(filepath, ',', true)
 }
 func NewReaderBytes(b []byte, sep byte, quoted bool) *Reader {
 	return NewReader(bytes.NewBuffer(b), sep, quoted)
@@ -28,7 +34,22 @@ func NewReaderString(s string, sep byte, quoted bool) *Reader {
 	return NewReader(strings.NewReader(s), sep, quoted)
 }
 func NewReader(rd io.Reader, sep byte, quoted bool) *Reader {
-	return &Reader{sep: sep, quoted: quoted, b: bufio.NewReader(rd), values: make([][]byte, 20)}
+	return &Reader{sep: sep, quoted: quoted, b: bufio.NewReader(rd), rd: rd, values: make([][]byte, 20)}
+}
+func NewFileReader(filepath string, sep byte, quoted bool) (*Reader, os.Error) {
+	rd, err := zopen(filepath)
+	if err != nil {
+		return nil, err
+	}
+	return NewReader(rd, sep, quoted), nil
+}
+
+func (r *Reader) Close() os.Error {
+	c, ok := r.rd.(io.Closer)
+	if ok {
+		return c.Close()
+	}
+	return nil
 }
 
 func (r *Reader) ReadRow() ([][]byte, os.Error) {
@@ -124,10 +145,10 @@ func unescapeQuotes(b []byte, count int) []byte {
 }
 
 func fixLastChunk(values [][]byte, continuation []byte) {
-	prefix := values[len(values) -1]
+	prefix := values[len(values)-1]
 	prefix = append(prefix, '\n') // TODO \r\n ?
 	prefix = append(prefix, continuation...)
-	values[len(values) -1] = prefix
+	values[len(values)-1] = prefix
 }
 
 func (r *Reader) readLine() ([]byte, os.Error) {
@@ -256,4 +277,38 @@ func deepCopy(row [][]byte, start int) int {
 		row[i] = dup
 	}
 	return len(row)
+}
+
+type zReadCloser struct {
+	f  *os.File
+	rd io.ReadCloser
+}
+
+// TODO Create golang bindings for zlib (gzopen) or libarchive?
+func zopen(filepath string) (io.ReadCloser, os.Error) {
+	f, err := os.Open(filepath)
+	if err != nil {
+		return nil, err
+	}
+	var rd io.ReadCloser
+	// TODO zip, bz2
+	if path.Ext(f.Name()) == ".gz" {
+		rd, err = gzip.NewReader(f)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		rd = f
+	}
+	return &zReadCloser{f, rd}, nil
+}
+func (z *zReadCloser) Read(b []byte) (n int, err os.Error) {
+	return z.rd.Read(b)
+}
+func (z *zReadCloser) Close() (err os.Error) {
+	err = z.rd.Close()
+	if err != nil {
+		return
+	}
+	return z.f.Close()
 }
