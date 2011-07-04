@@ -63,7 +63,7 @@ func (r *Reader) ReadRow() ([][]byte, os.Error) {
 		start := 0
 		values, isPrefix := r.scanLine(line, false)
 		for isPrefix {
-			start = deepCopy(values, start)
+			start = copyValues(values, start)
 			line, err := r.readLine()
 			if err != nil {
 				return nil, err
@@ -271,7 +271,7 @@ func (w *Writer) write(value []byte) (err os.Error) {
 	return
 }
 
-func deepCopy(row [][]byte, start int) int {
+func copyValues(row [][]byte, start int) int {
 	var dup []byte
 	for i := start; i < len(row); i++ {
 		dup = make([]byte, len(row[i]))
@@ -302,7 +302,7 @@ func zopen(filepath string) (io.ReadCloser, os.Error) {
 		return nil, err
 	}
 	var rd io.ReadCloser
-	// TODO zip, bz2
+	// TODO zip
 	ext := path.Ext(f.Name())
 	if ext == ".gz" {
 		rd, err = gzip.NewReader(f)
