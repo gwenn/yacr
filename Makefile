@@ -1,6 +1,6 @@
 include $(GOROOT)/src/Make.inc
 
-TARG=yacr
+TARG=github.com/gwenn/yacr
 GOFILES=\
 	yacr.go\
 
