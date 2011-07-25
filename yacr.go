@@ -53,6 +53,12 @@ func (r *Reader) Close() os.Error {
 	}
 	return nil
 }
+func (r *Reader) MustClose() {
+	err := r.Close()
+	if err != nil {
+		panic("yacr.MustClose error: " + err.String())
+	}
+}
 
 func (r *Reader) ReadRow() ([][]byte, os.Error) {
 	line, err := r.readLine()
@@ -73,6 +79,15 @@ func (r *Reader) ReadRow() ([][]byte, os.Error) {
 		return values, nil
 	}
 	return r.split(line), nil
+}
+func (r *Reader) MustReadRow() [][]byte {
+	row, err := r.ReadRow()
+	if err == os.EOF {
+		return nil
+	} else if err != nil {
+		panic("yacr.MustReadRow error: " + err.String())
+	}
+	return row
 }
 
 func (r *Reader) scanLine(line []byte, continuation bool) ([][]byte, bool) {
@@ -221,9 +236,21 @@ func (w *Writer) WriteRow(row [][]byte) (err os.Error) {
 	}
 	return
 }
+func (w *Writer) MustWriteRow(row [][]byte) {
+	err := w.WriteRow(row)
+	if err != nil {
+		panic("yacr.MustWriteRow error: " + err.String())
+	}
+}
 
 func (w *Writer) Flush() os.Error {
 	return w.b.Flush()
+}
+func (w *Writer) MustFlush() {
+	err := w.Flush()
+	if err != nil {
+		panic("yacr.MustFlush error: " + err.String())
+	}
 }
 
 func (w *Writer) write(value []byte) (err os.Error) {

@@ -138,12 +138,9 @@ func benchmarkParsing(b *testing.B, s string, quoted bool) {
 		r := makeReader(str, quoted)
 		nb := 0
 		for {
-			_, e := r.ReadRow()
-			if e == os.EOF {
+			row := r.MustReadRow()
+			if row == nil {
 				break
-			}
-			if e != nil {
-				panic(e.String())
 			}
 			nb++
 		}
