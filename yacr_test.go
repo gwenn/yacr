@@ -10,7 +10,7 @@ import (
 )
 
 func makeReader(s string, quoted bool) *Reader {
-	return NewReaderString(s, ',', quoted)
+	return NewReaderString(s, COMMA, quoted)
 }
 
 func checkValueCount(t *testing.T, expected int, values [][]byte) {
@@ -102,6 +102,19 @@ func TestEmbeddedNewline(t *testing.T) {
 	checkNoError(t, e)
 	checkValueCount(t, 4, values)
 	expected := [][]byte{[]byte("a"), []byte("b\nb"), []byte("c\n\n"), []byte("d")}
+	checkEquals(t, expected, values)
+}
+
+func TestGuess(t *testing.T) {
+	r := makeReader("a,b;c\td:e|f;g", false)
+	r.Guess = true
+	values, e := r.ReadRow()
+	checkNoError(t, e)
+	if ';' != r.Sep {
+		t.Errorf("Expected '%q', got '%q'", ';', r.Sep)
+	}
+	checkValueCount(t, 3, values)
+	expected := [][]byte{[]byte("a,b"), []byte("c\td:e|f"), []byte("g")}
 	checkEquals(t, expected, values)
 }
 

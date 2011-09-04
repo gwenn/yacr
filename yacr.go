@@ -13,9 +13,20 @@ import (
 	"strings"
 )
 
+const (
+	COMMA     = ','
+	SEMICOLON = ';'
+	TAB       = '\t'
+	PIPE      = '|'
+	COLON     = ':'
+)
+
+var seps = []byte{COMMA, SEMICOLON, TAB, PIPE, COLON}
+
 type Reader struct {
-	sep    byte
-	quoted bool
+	Sep    byte // values separator
+	Quoted bool // "value"
+	Guess  bool // values separator is guessed from the content of the (first) line
 	//trim	bool
 	b      *bufio.Reader
 	rd     io.Reader
@@ -24,10 +35,10 @@ type Reader struct {
 }
 
 func DefaultReader(rd io.Reader) *Reader {
-	return NewReader(rd, ',', true)
+	return NewReader(rd, COMMA, true)
 }
 func DefaultFileReader(filepath string) (*Reader, os.Error) {
-	return NewFileReader(filepath, ',', true)
+	return NewFileReader(filepath, COMMA, true)
 }
 func NewReaderBytes(b []byte, sep byte, quoted bool) *Reader {
 	return NewReader(bytes.NewBuffer(b), sep, quoted)
@@ -36,7 +47,7 @@ func NewReaderString(s string, sep byte, quoted bool) *Reader {
 	return NewReader(strings.NewReader(s), sep, quoted)
 }
 func NewReader(rd io.Reader, sep byte, quoted bool) *Reader {
-	return &Reader{sep: sep, quoted: quoted, b: bufio.NewReader(rd), rd: rd, values: make([][]byte, 20)}
+	return &Reader{Sep: sep, Quoted: quoted, b: bufio.NewReader(rd), rd: rd, values: make([][]byte, 20)}
 }
 func NewFileReader(filepath string, sep byte, quoted bool) (*Reader, os.Error) {
 	rd, err := zopen(filepath)
@@ -65,7 +76,10 @@ func (r *Reader) ReadRow() ([][]byte, os.Error) {
 	if err != nil {
 		return nil, err
 	}
-	if r.quoted {
+	if r.Guess {
+		r.guess(line)
+	}
+	if r.Quoted {
 		start := 0
 		values, isPrefix := r.scanLine(line, false)
 		for isPrefix {
@@ -112,11 +126,11 @@ func (r *Reader) scanLine(line []byte, continuation bool) ([][]byte, bool) {
 					quotedChunk = false
 					endQuotedChunk = i
 				}
-			} else if i == 0 || line[i-1] == r.sep {
+			} else if i == 0 || line[i-1] == r.Sep {
 				quotedChunk = true
 				start = i + 1
 			}
-		} else if line[i] == r.sep && !quotedChunk {
+		} else if line[i] == r.Sep && !quotedChunk {
 			if endQuotedChunk >= 0 {
 				chunk = unescapeQuotes(line[start:endQuotedChunk], escapedQuotes)
 				escapedQuotes = 0
@@ -193,7 +207,7 @@ func (r *Reader) split(line []byte) [][]byte {
 	start := 0
 	a := r.values[0:0]
 	for i := 0; i < len(line); i++ {
-		if line[i] == r.sep {
+		if line[i] == r.Sep {
 			a = append(a, line[start:i])
 			start = i + 1
 		}
@@ -203,24 +217,45 @@ func (r *Reader) split(line []byte) [][]byte {
 	return a
 }
 
+func (r *Reader) guess(line []byte) {
+	count := make(map[byte]uint)
+	for _, b := range line {
+		if bytes.IndexByte(seps, b) >= 0 {
+			count[b] += 1
+		}
+	}
+	var max uint
+	var sep byte
+	for b, c := range count {
+		if c > max {
+			max = c
+			sep = b
+		}
+	}
+	if max > 0 {
+		r.Sep = sep
+		r.Guess = false
+	}
+}
+
 type Writer struct {
-	sep    byte
-	quoted bool
+	Sep    byte
+	Quoted bool
 	//trim	bool
 	b *bufio.Writer
 }
 
 func DefaultWriter(wr io.Writer) *Writer {
-	return NewWriter(wr, ',', true)
+	return NewWriter(wr, COMMA, true)
 }
 func NewWriter(wr io.Writer, sep byte, quoted bool) *Writer {
-	return &Writer{sep: sep, quoted: quoted, b: bufio.NewWriter(wr)}
+	return &Writer{Sep: sep, Quoted: quoted, b: bufio.NewWriter(wr)}
 }
 
 func (w *Writer) WriteRow(row [][]byte) (err os.Error) {
 	for i, v := range row {
 		if i > 0 {
-			err = w.b.WriteByte(w.sep)
+			err = w.b.WriteByte(w.Sep)
 			if err != nil {
 				return
 			}
@@ -254,12 +289,12 @@ func (w *Writer) MustFlush() {
 }
 
 func (w *Writer) write(value []byte) (err os.Error) {
-	// In quoted mode, value is enclosed between quotes if it contains sep, quote or \n.
-	if w.quoted {
+	// In quoted mode, value is enclosed between quotes if it contains Sep, quote or \n.
+	if w.Quoted {
 		last := 0
 		for i, c := range value {
 			switch c {
-			case '"', '\n', w.sep:
+			case '"', '\n', w.Sep:
 			default:
 				continue
 			}
