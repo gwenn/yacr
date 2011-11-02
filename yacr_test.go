@@ -3,7 +3,7 @@ package yacr
 
 import (
 	"bytes"
-	"os"
+	"io"
 	"reflect"
 	"strings"
 	"testing"
@@ -19,7 +19,7 @@ func checkValueCount(t *testing.T, expected int, values [][]byte) {
 	}
 }
 
-func checkNoError(t *testing.T, e os.Error) {
+func checkNoError(t *testing.T, e error) {
 	if e != nil {
 		t.Error(e)
 	}
@@ -43,7 +43,7 @@ func TestSingleValue(t *testing.T) {
 	if e == nil {
 		t.Error("EOF expected")
 	}
-	if e != os.EOF {
+	if e != io.EOF {
 		t.Error(e)
 	}
 }

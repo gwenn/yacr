@@ -23,6 +23,7 @@ const (
 
 var seps = []byte{COMMA, SEMICOLON, TAB, PIPE, COLON}
 
+// TODO: Check 'buf' and 'values' behaves as expected
 type Reader struct {
 	Sep    byte // values separator
 	Quoted bool // "value"
@@ -37,7 +38,7 @@ type Reader struct {
 func DefaultReader(rd io.Reader) *Reader {
 	return NewReader(rd, COMMA, true)
 }
-func DefaultFileReader(filepath string) (*Reader, os.Error) {
+func DefaultFileReader(filepath string) (*Reader, error) {
 	return NewFileReader(filepath, COMMA, true)
 }
 func NewReaderBytes(b []byte, sep byte, quoted bool) *Reader {
@@ -49,7 +50,7 @@ func NewReaderString(s string, sep byte, quoted bool) *Reader {
 func NewReader(rd io.Reader, sep byte, quoted bool) *Reader {
 	return &Reader{Sep: sep, Quoted: quoted, b: bufio.NewReader(rd), rd: rd, values: make([][]byte, 20)}
 }
-func NewFileReader(filepath string, sep byte, quoted bool) (*Reader, os.Error) {
+func NewFileReader(filepath string, sep byte, quoted bool) (*Reader, error) {
 	rd, err := zopen(filepath)
 	if err != nil {
 		return nil, err
@@ -57,7 +58,7 @@ func NewFileReader(filepath string, sep byte, quoted bool) (*Reader, os.Error) {
 	return NewReader(rd, sep, quoted), nil
 }
 
-func (r *Reader) Close() os.Error {
+func (r *Reader) Close() error {
 	c, ok := r.rd.(io.Closer)
 	if ok {
 		return c.Close()
@@ -67,11 +68,11 @@ func (r *Reader) Close() os.Error {
 func (r *Reader) MustClose() {
 	err := r.Close()
 	if err != nil {
-		panic("yacr.MustClose error: " + err.String())
+		panic("yacr.MustClose error: " + err.Error())
 	}
 }
 
-func (r *Reader) ReadRow() ([][]byte, os.Error) {
+func (r *Reader) ReadRow() ([][]byte, error) {
 	line, err := r.readLine()
 	if err != nil {
 		return nil, err
@@ -96,10 +97,10 @@ func (r *Reader) ReadRow() ([][]byte, os.Error) {
 }
 func (r *Reader) MustReadRow() [][]byte {
 	row, err := r.ReadRow()
-	if err == os.EOF {
+	if err == io.EOF {
 		return nil
 	} else if err != nil {
-		panic("yacr.MustReadRow error: " + err.String())
+		panic("yacr.MustReadRow error: " + err.Error())
 	}
 	return row
 }
@@ -182,9 +183,9 @@ func fixLastChunk(values [][]byte, continuation []byte) {
 	values[len(values)-1] = prefix
 }
 
-func (r *Reader) readLine() ([]byte, os.Error) {
+func (r *Reader) readLine() ([]byte, error) {
 	var buf, line []byte
-	var err os.Error
+	var err error
 	isPrefix := true
 	for isPrefix {
 		line, isPrefix, err = r.b.ReadLine()
@@ -252,7 +253,7 @@ func NewWriter(wr io.Writer, sep byte, quoted bool) *Writer {
 	return &Writer{Sep: sep, Quoted: quoted, b: bufio.NewWriter(wr)}
 }
 
-func (w *Writer) WriteRow(row [][]byte) (err os.Error) {
+func (w *Writer) WriteRow(row [][]byte) (err error) {
 	for i, v := range row {
 		if i > 0 {
 			err = w.b.WriteByte(w.Sep)
@@ -274,21 +275,21 @@ func (w *Writer) WriteRow(row [][]byte) (err os.Error) {
 func (w *Writer) MustWriteRow(row [][]byte) {
 	err := w.WriteRow(row)
 	if err != nil {
-		panic("yacr.MustWriteRow error: " + err.String())
+		panic("yacr.MustWriteRow error: " + err.Error())
 	}
 }
 
-func (w *Writer) Flush() os.Error {
+func (w *Writer) Flush() error {
 	return w.b.Flush()
 }
 func (w *Writer) MustFlush() {
 	err := w.Flush()
 	if err != nil {
-		panic("yacr.MustFlush error: " + err.String())
+		panic("yacr.MustFlush error: " + err.Error())
 	}
 }
 
-func (w *Writer) write(value []byte) (err os.Error) {
+func (w *Writer) write(value []byte) (err error) {
 	// In quoted mode, value is enclosed between quotes if it contains Sep, quote or \n.
 	if w.Quoted {
 		last := 0
@@ -358,7 +359,7 @@ type zReadCloser struct {
 }
 
 // TODO Create golang bindings for zlib (gzopen) or libarchive?
-func zopen(filepath string) (io.ReadCloser, os.Error) {
+func zopen(filepath string) (io.ReadCloser, error) {
 	f, err := os.Open(filepath)
 	if err != nil {
 		return nil, err
@@ -378,10 +379,10 @@ func zopen(filepath string) (io.ReadCloser, os.Error) {
 	}
 	return &zReadCloser{f, rd}, nil
 }
-func (z *zReadCloser) Read(b []byte) (n int, err os.Error) {
+func (z *zReadCloser) Read(b []byte) (n int, err error) {
 	return z.rd.Read(b)
 }
-func (z *zReadCloser) Close() (err os.Error) {
+func (z *zReadCloser) Close() (err error) {
 	err = z.rd.Close()
 	if err != nil {
 		return
