@@ -1,4 +1,6 @@
 // The author disclaims copyright to this source code.
+
+// Yet another CSV reader (and writer) with small memory usage.
 package yacr
 
 import (
@@ -23,7 +25,6 @@ const (
 
 var seps = []byte{COMMA, SEMICOLON, TAB, PIPE, COLON}
 
-// TODO: Check 'buf' and 'values' behaves as expected
 type Reader struct {
 	Sep    byte // values separator
 	Quoted bool // "value"
@@ -72,7 +73,8 @@ func (r *Reader) MustClose() {
 	}
 }
 
-func (r *Reader) ReadRow() ([][]byte, error) {
+// The returned values are only valid until the next call to ReadRow.
+func (r *Reader) ReadRow() ([][]byte, error) { // TODO let the caller choose to reuse or not the same values: ReadRow(values [][]byte) ([][]byte, error)
 	line, err := r.readLine()
 	if err != nil {
 		return nil, err
@@ -314,7 +316,7 @@ func (w *Writer) write(value []byte) (err error) {
 				return
 			}
 			if c == '"' {
-				err = w.b.WriteByte(c)
+				err = w.b.WriteByte(c) // escaped with another double quote
 				if err != nil {
 					return
 				}
@@ -359,6 +361,7 @@ type zReadCloser struct {
 }
 
 // TODO Create golang bindings for zlib (gzopen) or libarchive?
+// Check 'mime' package
 func zopen(filepath string) (io.ReadCloser, error) {
 	f, err := os.Open(filepath)
 	if err != nil {

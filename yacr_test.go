@@ -21,7 +21,7 @@ func checkValueCount(t *testing.T, expected int, values [][]byte) {
 
 func checkNoError(t *testing.T, e error) {
 	if e != nil {
-		t.Error(e)
+		t.Fatal(e)
 	}
 }
 
