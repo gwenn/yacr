@@ -3,6 +3,7 @@ package yacr
 
 import (
 	"bytes"
+	"encoding/csv"
 	"io"
 	"reflect"
 	"strings"
@@ -138,7 +139,7 @@ func BenchmarkParsing(b *testing.B) {
 func BenchmarkQuotedParsing(b *testing.B) {
 	benchmarkParsing(b, "aaaaaaaa,b b b b b b b,\"cc cc cc,cc\",cc, ddddd ddd\n", true)
 }
-func BenchmarkEmbeddedNewline(b *testing.B) {
+func BenchmarkEmbeddedNL(b *testing.B) {
 	benchmarkParsing(b, "aaaaaaaa,b b b b b b b,\"fo \n oo\",\"c oh c yes c \", ddddd ddd\n", true)
 }
 
@@ -153,6 +154,55 @@ func benchmarkParsing(b *testing.B, s string, quoted bool) {
 		for {
 			row := r.MustReadRow()
 			if row == nil {
+				break
+			}
+			nb++
+		}
+		if nb != 2000 {
+			panic("wrong # rows")
+		}
+	}
+}
+
+func BenchmarkStdParser(b *testing.B) {
+	b.StopTimer()
+	s := strings.Repeat("aaaaaaaa,b b b b b b b,\"fo \n oo\",\"c oh c yes c \", ddddd ddd\n", 2000)
+	b.SetBytes(int64(len(s)))
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		r := csv.NewReader(strings.NewReader(s))
+		//r.TrailingComma = true
+		nb := 0
+		for {
+			_, err := r.Read()
+			if err != nil {
+				if err != io.EOF {
+					panic(err)
+				}
+				break
+			}
+			nb++
+		}
+		if nb != 2000 {
+			panic("wrong # rows")
+		}
+	}
+}
+
+func BenchmarkYacrParser(b *testing.B) {
+	b.StopTimer()
+	s := strings.Repeat("aaaaaaaa,b b b b b b b,\"fo \n oo\",\"c oh c yes c \", ddddd ddd\n", 2000)
+	b.SetBytes(int64(len(s)))
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		r := DefaultReader(strings.NewReader(s))
+		nb := 0
+		for {
+			_, err := r.ReadRow()
+			if err != nil {
+				if err != io.EOF {
+					panic(err)
+				}
 				break
 			}
 			nb++
