@@ -1,9 +1,11 @@
 // The author disclaims copyright to this source code.
-package yacr
+
+package yacr_test
 
 import (
 	"bytes"
 	"encoding/csv"
+	. "github.com/gwenn/yacr"
 	"io"
 	"reflect"
 	"strings"

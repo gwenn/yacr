@@ -255,6 +255,26 @@ func NewWriter(wr io.Writer, sep byte, quoted bool) *Writer {
 	return &Writer{Sep: sep, Quoted: quoted, b: bufio.NewWriter(wr)}
 }
 
+func (w *Writer) Write(row []string) (err error) {
+	for i, v := range row {
+		if i > 0 {
+			err = w.b.WriteByte(w.Sep)
+			if err != nil {
+				return
+			}
+		}
+		err = w.write([]byte(v)) // TODO avoid copy?
+		if err != nil {
+			return
+		}
+	}
+	err = w.b.WriteByte('\n') // TODO \r\n ?
+	if err != nil {
+		return
+	}
+	return
+}
+
 func (w *Writer) WriteRow(row [][]byte) (err error) {
 	for i, v := range row {
 		if i > 0 {
