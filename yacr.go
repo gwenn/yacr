@@ -113,7 +113,7 @@ func (r *Reader) scanLine(line []byte, continuation bool) ([][]byte, bool) {
 	if continuation {
 		a = r.values
 	} else {
-		a = r.values[0:0]
+		a = r.values[:0]
 	}
 	quotedChunk := continuation
 	endQuotedChunk := -1
@@ -168,14 +168,13 @@ func unescapeQuotes(b []byte, count int) []byte {
 	if count == 0 {
 		return b
 	}
-	c := make([]byte, len(b)-count)
 	for i, j := 0, 0; i < len(b); i, j = i+1, j+1 {
-		c[j] = b[i]
+		b[j] = b[i]
 		if b[i] == '"' {
 			i++
 		}
 	}
-	return c
+	return b[:len(b)-count]
 }
 
 func fixLastChunk(values [][]byte, continuation []byte) {
@@ -198,7 +197,7 @@ func (r *Reader) readLine() ([]byte, error) {
 			if !isPrefix {
 				return line, nil
 			}
-			buf = r.buf[0:0]
+			buf = r.buf[:0]
 		}
 		buf = append(buf, line...)
 	}
@@ -208,7 +207,7 @@ func (r *Reader) readLine() ([]byte, error) {
 
 func (r *Reader) split(line []byte) [][]byte {
 	start := 0
-	a := r.values[0:0]
+	a := r.values[:0]
 	for i := 0; i < len(line); i++ {
 		if line[i] == r.Sep {
 			a = append(a, line[start:i])
