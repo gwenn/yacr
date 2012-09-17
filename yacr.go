@@ -27,7 +27,7 @@ var seps = []byte{COMMA, SEMICOLON, TAB, PIPE, COLON}
 
 type Reader struct {
 	Sep    byte // values separator
-	Quoted bool // "value"
+	Quoted bool // Specify if values may be quoted (when they contains separator or newline)
 	Guess  bool // values separator is guessed from the content of the (first) line
 	//trim	bool
 	b      *bufio.Reader
@@ -36,21 +36,32 @@ type Reader struct {
 	values [][]byte
 }
 
+// DefaultReader creates a "standard" CSV reader
 func DefaultReader(rd io.Reader) *Reader {
 	return NewReader(rd, COMMA, true)
 }
+
+// DefaultFileReader creates a "standard" CSV reader for the specified file.
 func DefaultFileReader(filepath string) (*Reader, error) {
 	return NewFileReader(filepath, COMMA, true)
 }
+
+// NewReaderBytes creates a CSV reader for the specified bytes.
 func NewReaderBytes(b []byte, sep byte, quoted bool) *Reader {
 	return NewReader(bytes.NewBuffer(b), sep, quoted)
 }
+
+// NewReaderString creates a CSV reader for the specified content.
 func NewReaderString(s string, sep byte, quoted bool) *Reader {
 	return NewReader(strings.NewReader(s), sep, quoted)
 }
+
+// NewReader creates a custom DSV reader
 func NewReader(rd io.Reader, sep byte, quoted bool) *Reader {
 	return &Reader{Sep: sep, Quoted: quoted, b: bufio.NewReader(rd), rd: rd, values: make([][]byte, 20)}
 }
+
+// NewFileReader creates a custom DSV reader for the specified file.
 func NewFileReader(filepath string, sep byte, quoted bool) (*Reader, error) {
 	rd, err := zopen(filepath)
 	if err != nil {
@@ -66,6 +77,8 @@ func (r *Reader) Close() error {
 	}
 	return nil
 }
+
+// MustClose is like Close except it panics on error
 func (r *Reader) MustClose() {
 	err := r.Close()
 	if err != nil {
@@ -73,6 +86,7 @@ func (r *Reader) MustClose() {
 	}
 }
 
+// ReadRow consumes a line returning its values.
 // The returned values are only valid until the next call to ReadRow.
 func (r *Reader) ReadRow() ([][]byte, error) { // TODO let the caller choose to reuse or not the same values: ReadRow(values [][]byte) ([][]byte, error)
 	line, err := r.readLine()
@@ -97,6 +111,8 @@ func (r *Reader) ReadRow() ([][]byte, error) { // TODO let the caller choose to 
 	}
 	return r.split(line), nil
 }
+
+// MustReadRow is like ReadRow except that it panics on error
 func (r *Reader) MustReadRow() [][]byte {
 	row, err := r.ReadRow()
 	if err == io.EOF {
@@ -240,20 +256,25 @@ func (r *Reader) guess(line []byte) {
 	}
 }
 
+// CSV writer
 type Writer struct {
-	Sep    byte
-	Quoted bool
+	Sep    byte // values separator
+	Quoted bool // Specify if values should be quoted (when they contain a separator or a newline)
 	//trim	bool
 	b *bufio.Writer
 }
 
+// DefaultWriter creates a "standard" CSV writer (separator is comma and quoted mode active)
 func DefaultWriter(wr io.Writer) *Writer {
 	return NewWriter(wr, COMMA, true)
 }
+
+// NewWriter creates a custom DSV writer (separator and quoted mode specified by the caller)
 func NewWriter(wr io.Writer, sep byte, quoted bool) *Writer {
 	return &Writer{Sep: sep, Quoted: quoted, b: bufio.NewWriter(wr)}
 }
 
+// Write ensures that row values are quoted when needed.
 func (w *Writer) Write(row []string) (err error) {
 	for i, v := range row {
 		if i > 0 {
@@ -274,6 +295,7 @@ func (w *Writer) Write(row []string) (err error) {
 	return
 }
 
+// WriteRow ensures that row values are quoted when needed.
 func (w *Writer) WriteRow(row [][]byte) (err error) {
 	for i, v := range row {
 		if i > 0 {
@@ -293,6 +315,8 @@ func (w *Writer) WriteRow(row [][]byte) (err error) {
 	}
 	return
 }
+
+// MustWriteRow is like WriteRow except that it panics on error
 func (w *Writer) MustWriteRow(row [][]byte) {
 	err := w.WriteRow(row)
 	if err != nil {
@@ -300,9 +324,12 @@ func (w *Writer) MustWriteRow(row [][]byte) {
 	}
 }
 
+// Flush ensures the writer's buffer is flushed.
 func (w *Writer) Flush() error {
 	return w.b.Flush()
 }
+
+// MustFlush is like Flush except that it panics on error
 func (w *Writer) MustFlush() {
 	err := w.Flush()
 	if err != nil {
