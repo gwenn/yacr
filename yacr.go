@@ -1,4 +1,6 @@
-// The author disclaims copyright to this source code.
+// Copyright 2011 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 
 // Yet another CSV reader (and writer) with small memory usage.
 package yacr
@@ -36,19 +38,19 @@ type Reader struct {
 	values [][]byte
 }
 
-// DefaultReader creates a "standard" CSV reader
+// DefaultReader creates a "standard" CSV reader (separator is comma and quoted mode active)
 func DefaultReader(rd io.Reader) *Reader {
 	return NewReader(rd, COMMA, true)
 }
 
-// DefaultFileReader creates a "standard" CSV reader for the specified file.
+// DefaultFileReader creates a "standard" CSV reader for the specified file (separator is comma and quoted mode active).
 func DefaultFileReader(filepath string) (*Reader, error) {
 	return NewFileReader(filepath, COMMA, true)
 }
 
 // NewReaderBytes creates a CSV reader for the specified bytes.
 func NewReaderBytes(b []byte, sep byte, quoted bool) *Reader {
-	return NewReader(bytes.NewBuffer(b), sep, quoted)
+	return NewReader(bytes.NewReader(b), sep, quoted)
 }
 
 // NewReaderString creates a CSV reader for the specified content.
