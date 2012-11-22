@@ -32,9 +32,8 @@ type Reader struct {
 	Quoted bool // Specify if values may be quoted (when they contains separator or newline)
 	Guess  bool // values separator is guessed from the content of the (first) line
 	//trim	bool
-	b      *bufio.Reader
 	rd     io.Reader
-	buf    []byte
+	buf    *LineReader
 	values [][]byte
 }
 
@@ -60,7 +59,7 @@ func NewReaderString(s string, sep byte, quoted bool) *Reader {
 
 // NewReader creates a custom DSV reader
 func NewReader(rd io.Reader, sep byte, quoted bool) *Reader {
-	return &Reader{Sep: sep, Quoted: quoted, b: bufio.NewReader(rd), rd: rd, values: make([][]byte, 20)}
+	return &Reader{Sep: sep, Quoted: quoted, rd: rd, buf: NewLineReader(rd, 4096, 8*4096), values: make([][]byte, 20)}
 }
 
 // NewFileReader creates a custom DSV reader for the specified file.
@@ -91,7 +90,7 @@ func (r *Reader) MustClose() {
 // ReadRow consumes a line returning its values.
 // The returned values are only valid until the next call to ReadRow.
 func (r *Reader) ReadRow() ([][]byte, error) { // TODO let the caller choose to reuse or not the same values: ReadRow(values [][]byte) ([][]byte, error)
-	line, err := r.readLine()
+	line, err := r.buf.ReadLine()
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +102,7 @@ func (r *Reader) ReadRow() ([][]byte, error) { // TODO let the caller choose to 
 		values, isPrefix := r.scanLine(line, false)
 		for isPrefix {
 			start = copyValues(values, start)
-			line, err := r.readLine()
+			line, err := r.buf.ReadLine()
 			if err != nil {
 				return nil, err
 			}
@@ -200,27 +199,6 @@ func fixLastChunk(values [][]byte, continuation []byte) {
 	prefix = append(prefix, '\n') // TODO \r\n ?
 	prefix = append(prefix, continuation...)
 	values[len(values)-1] = prefix
-}
-
-func (r *Reader) readLine() ([]byte, error) {
-	var buf, line []byte
-	var err error
-	isPrefix := true
-	for isPrefix {
-		line, isPrefix, err = r.b.ReadLine()
-		if err != nil {
-			return nil, err
-		}
-		if buf == nil {
-			if !isPrefix {
-				return line, nil
-			}
-			buf = r.buf[:0]
-		}
-		buf = append(buf, line...)
-	}
-	r.buf = buf // if cap(buf) != cap(r.buf)
-	return buf, nil
 }
 
 func (r *Reader) split(line []byte) [][]byte {
