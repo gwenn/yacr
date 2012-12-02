@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"compress/bzip2"
 	"compress/gzip"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -37,6 +38,13 @@ type Reader struct {
 	values [][]byte
 }
 
+type quotedEndOfLiner struct {
+	reader        *Reader
+	startOfValue  bool
+	quotedValue   bool
+	previousQuote int
+}
+
 // DefaultReader creates a "standard" CSV reader (separator is comma and quoted mode active)
 func DefaultReader(rd io.Reader) *Reader {
 	return NewReader(rd, COMMA, true)
@@ -59,7 +67,11 @@ func NewReaderString(s string, sep byte, quoted bool) *Reader {
 
 // NewReader creates a custom DSV reader
 func NewReader(rd io.Reader, sep byte, quoted bool) *Reader {
-	return &Reader{Sep: sep, Quoted: quoted, rd: rd, buf: NewLineReader(rd, 4096, 8*4096), values: make([][]byte, 20)}
+	r := &Reader{Sep: sep, Quoted: quoted, rd: rd, buf: NewLineReader(rd, 4096, 8*4096, nil), values: make([][]byte, 20)}
+	if quoted {
+		r.buf.eoler = &quotedEndOfLiner{reader: r, startOfValue: true}
+	}
+	return r
 }
 
 // NewFileReader creates a custom DSV reader for the specified file.
@@ -98,19 +110,34 @@ func (r *Reader) ReadRow() ([][]byte, error) { // TODO let the caller choose to 
 		r.guess(line)
 	}
 	if r.Quoted {
-		start := 0
-		values, isPrefix := r.scanLine(line, false)
-		for isPrefix {
-			start = copyValues(values, start)
-			line, err := r.buf.ReadLine()
-			if err != nil {
-				return nil, err
-			}
-			values, isPrefix = r.scanLine(line, true)
-		}
-		return values, nil
+		return r.scanLine(line)
 	}
 	return r.split(line), nil
+}
+
+func (q *quotedEndOfLiner) eol(buf []byte) int {
+	for i, b := range buf {
+		if q.startOfValue {
+			q.startOfValue = false
+			q.quotedValue = b == '"'
+		} else if q.quotedValue && b == '"' {
+			q.previousQuote++
+		} else if q.previousQuote > 0 {
+			if q.previousQuote%2 != 0 {
+				q.quotedValue = false
+			}
+			q.previousQuote = 0
+		}
+		if !q.quotedValue {
+			if b == '\n' {
+				q.startOfValue = true
+				return i
+			} else if b == q.reader.Sep { // FIXME Guess
+				q.startOfValue = true
+			}
+		}
+	}
+	return -1
 }
 
 // MustReadRow is like ReadRow except that it panics on error
@@ -124,15 +151,10 @@ func (r *Reader) MustReadRow() [][]byte {
 	return row
 }
 
-func (r *Reader) scanLine(line []byte, continuation bool) ([][]byte, bool) {
+func (r *Reader) scanLine(line []byte) ([][]byte, error) {
 	start := 0
-	var a [][]byte
-	if continuation {
-		a = r.values
-	} else {
-		a = r.values[:0]
-	}
-	quotedChunk := continuation
+	a := r.values[:0]
+	quotedChunk := false
 	endQuotedChunk := -1
 	escapedQuotes := 0
 	var chunk []byte
@@ -158,12 +180,7 @@ func (r *Reader) scanLine(line []byte, continuation bool) ([][]byte, bool) {
 			} else {
 				chunk = line[start:i]
 			}
-			if continuation {
-				fixLastChunk(a, chunk)
-				continuation = false
-			} else {
-				a = append(a, chunk)
-			}
+			a = append(a, chunk)
 			start = i + 1
 		}
 	}
@@ -172,13 +189,12 @@ func (r *Reader) scanLine(line []byte, continuation bool) ([][]byte, bool) {
 	} else {
 		chunk = unescapeQuotes(line[start:], escapedQuotes)
 	}
-	if continuation {
-		fixLastChunk(a, chunk)
-	} else {
-		a = append(a, chunk)
-	}
+	a = append(a, chunk)
 	r.values = a // if cap(a) != cap(r.values)
-	return a, quotedChunk
+	if quotedChunk {
+		return nil, fmt.Errorf("Partial line: %q", string(line))
+	}
+	return a, nil
 }
 
 func unescapeQuotes(b []byte, count int) []byte {
@@ -360,16 +376,6 @@ func (w *Writer) write(value []byte) (err error) {
 		_, err = w.b.Write(value)
 	}
 	return
-}
-
-func copyValues(row [][]byte, start int) int {
-	var dup []byte
-	for i := start; i < len(row); i++ {
-		dup = make([]byte, len(row[i]))
-		copy(dup, row[i])
-		row[i] = dup
-	}
-	return len(row)
 }
 
 func DeepCopy(row [][]byte) [][]byte {
