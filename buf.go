@@ -88,5 +88,4 @@ func (b *LineReader) ReadLine() ([]byte, error) {
 			return b.buf[:b.w], err
 		}
 	}
-	panic("not reached")
 }
