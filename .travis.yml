@@ -1,6 +1,2 @@
 language: go
-before_install:
- - sudo add-apt-repository -qq ppa:travis-ci/sqlite3
- - sudo apt-get update -qq
- - sudo apt-get install -qq libsqlite3-dev
 before_script: go get github.com/gwenn/yacr
