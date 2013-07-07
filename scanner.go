@@ -108,23 +108,112 @@ func unescapeQuotes(b []byte, count int) []byte {
 	return b[:len(b)-count]
 }
 
+// CSV writer
+type Writer struct {
+	b      *bufio.Writer
+	sep    byte  // values separator
+	quoted bool  // specify if values should be quoted (when they contain a separator or a newline)
+	sor    bool  // true at start of record
+	err    error // sticky error.
+}
+
+// NewWriter returns a new CSV writer.
+func NewWriter(w io.Writer, sep byte, quoted bool) *Writer {
+	return &Writer{b: bufio.NewWriter(w), sep: sep, quoted: quoted, sor: true}
+}
+
+// Write ensures that field is quoted when needed.
+func (w *Writer) Write(field []byte) bool {
+	if w.err != nil {
+		return false
+	}
+	if !w.sor {
+		w.setErr(w.b.WriteByte(w.sep))
+	}
+	// In quoted mode, field is enclosed between quotes if it contains sep, quote or \n.
+	if w.quoted {
+		last := 0
+		for i, c := range field {
+			switch c {
+			case '"', '\n', w.sep:
+			default:
+				continue
+			}
+			if last == 0 {
+				w.setErr(w.b.WriteByte('"'))
+			}
+			if _, err := w.b.Write(field[last:i]); err != nil {
+				w.setErr(err)
+			}
+			w.setErr(w.b.WriteByte(c))
+			if c == '"' {
+				w.setErr(w.b.WriteByte(c)) // escaped with another double quote
+			}
+			last = i + 1
+		}
+		if _, err := w.b.Write(field[last:]); err != nil {
+			w.setErr(err)
+		}
+		if last != 0 {
+			w.setErr(w.b.WriteByte('"'))
+		}
+	} else {
+		if _, err := w.b.Write(field); err != nil {
+			w.setErr(err)
+		}
+	}
+	w.sor = false
+	return w.err == nil
+}
+
+func (w *Writer) WriteField(field string) bool {
+	return w.Write([]byte(field)) // TODO avoid copy?
+}
+
+// EndOfRecord tells when a line break must be inserted.
+func (w *Writer) EndOfRecord() {
+	w.setErr(w.b.WriteByte('\n')) // TODO \r\n ?
+	w.sor = true
+}
+
+// Flush ensures the writer's buffer is flushed.
+func (w *Writer) Flush() {
+	w.setErr(w.b.Flush())
+}
+
+// Err returns the first error that was encountered by the Writer.
+func (w *Writer) Err() error {
+	return w.err
+}
+
+// setErr records the first error encountered.
+func (w *Writer) setErr(err error) {
+	if w.err == nil {
+		w.err = err
+	}
+}
 func main() {
 	s := NewScanner(os.Stdin, '\t', false)
-	/*null, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	//s := NewScanner(os.Stdin, ',', true)
+	//null, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	null, err := os.Create("/tmp/scanner.csv")
 	if err != nil {
 		panic(err)
 	}
-	defer null.Close()*/
+	defer null.Close()
+	w := NewWriter(null, '\t', false)
+	//w := NewWriter(null, ',', true)
 
-	for s.Scan() {
-		//null.Write(s.Bytes()) // TODO error handling
+	for s.Scan() && w.Write(s.Bytes()) {
 		if s.EndOfRecord() {
-			//null.WriteString("\n") // TODO error handling
-		} else {
-			//null.WriteString("|") // TODO error handling
+			w.EndOfRecord()
 		}
 	}
+	w.Flush()
 	if err := s.Err(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+	if err := w.Err(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
 }
