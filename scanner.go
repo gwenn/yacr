@@ -57,7 +57,7 @@ func (s *Scanner) scanField(data []byte, atEOF bool) (advance int, token []byte,
 			if pc == '"' && (c == s.sep || c == '\n') {
 				s.eor = c == '\n'
 				return i + 1, unescapeQuotes(data[1:i-1], escapedQuotes), nil
-			} else if c == '\n' && pc == '\r' && i > 2 && data[i-2] == '"' {
+			} else if c == '\n' && pc == '\r' && i >= 2 && data[i-2] == '"' {
 				s.eor = true
 				return i + 1, unescapeQuotes(data[1:i-2], escapedQuotes), nil
 			}
