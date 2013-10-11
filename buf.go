@@ -14,22 +14,22 @@ var (
 	ErrBufferFull = errors.New("buffer full")
 )
 
-// EndOfLiner gives the position of end of line.
-type EndOfLiner interface {
+// endOfLiner gives the position of end of line.
+type endOfLiner interface {
 	eol([]byte) int // eol returns the index/position of end of line in the specified slice or -1 if not present.
 }
 
-// LineReader implements buffering for an io.Reader object.
-type LineReader struct {
+// lineReader implements buffering for an io.Reader object.
+type lineReader struct {
 	buf   []byte
 	rd    io.Reader
 	r, w  int
 	max   int
-	eoler EndOfLiner
+	eoler endOfLiner
 }
 
-func NewLineReader(rd io.Reader, size, max int, eoler EndOfLiner) *LineReader {
-	lineReader := &LineReader{
+func newLineReader(rd io.Reader, size, max int, eoler endOfLiner) *lineReader {
+	lineReader := &lineReader{
 		buf:   make([]byte, size),
 		rd:    rd,
 		max:   max,
@@ -41,11 +41,11 @@ func NewLineReader(rd io.Reader, size, max int, eoler EndOfLiner) *LineReader {
 	return lineReader
 }
 
-func (b *LineReader) eol(buf []byte) int {
+func (b *lineReader) eol(buf []byte) int {
 	return bytes.IndexByte(buf, '\n')
 }
 
-func (b *LineReader) ReadLine() ([]byte, error) {
+func (b *lineReader) readLine() ([]byte, error) {
 	p := b.r
 	for {
 		// Look in buffer.

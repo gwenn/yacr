@@ -34,7 +34,7 @@ type Reader struct {
 	Guess  bool // values separator is guessed from the content of the (first) line
 	//trim	bool
 	rd     io.Reader
-	buf    *LineReader
+	buf    *lineReader
 	values [][]byte
 }
 
@@ -67,7 +67,7 @@ func NewReaderString(s string, sep byte, quoted bool) *Reader {
 
 // NewReader creates a custom DSV reader
 func NewReader(rd io.Reader, sep byte, quoted bool) *Reader {
-	r := &Reader{Sep: sep, Quoted: quoted, rd: rd, buf: NewLineReader(rd, 4096, 8*4096, nil), values: make([][]byte, 20)}
+	r := &Reader{Sep: sep, Quoted: quoted, rd: rd, buf: newLineReader(rd, 4096, 8*4096, nil), values: make([][]byte, 20)}
 	if quoted {
 		r.buf.eoler = &quotedEndOfLiner{reader: r, startOfValue: true}
 	}
@@ -102,7 +102,7 @@ func (r *Reader) MustClose() {
 // ReadRow consumes a line returning its values.
 // The returned values are only valid until the next call to ReadRow.
 func (r *Reader) ReadRow() ([][]byte, error) { // TODO let the caller choose to reuse or not the same values: ReadRow(values [][]byte) ([][]byte, error)
-	line, err := r.buf.ReadLine()
+	line, err := r.buf.readLine()
 	if err != nil {
 		return nil, err
 	}
