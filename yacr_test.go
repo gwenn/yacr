@@ -115,7 +115,7 @@ func TestTwoLines(t *testing.T) {
 	checkValueCount(t, 51, values)
 	values = readRow(r)
 	checkNoError(t, r.Err())
-	checkValueCount(t, 30, values)
+	checkValueCount(t, 30, values) // FIXME 31
 }
 
 func TestLongLine(t *testing.T) {
@@ -123,7 +123,7 @@ func TestLongLine(t *testing.T) {
 	r := makeReader(content, true)
 	values := readRow(r)
 	checkNoError(t, r.Err())
-	checkValueCount(t, 2000, values)
+	checkValueCount(t, 2000, values) // FIXME 2001
 }
 
 func TestQuotedLine(t *testing.T) {
@@ -225,14 +225,14 @@ func BenchmarkStdParser(b *testing.B) {
 			_, err := r.Read()
 			if err != nil {
 				if err != io.EOF {
-					panic(err)
+					b.Fatal(err)
 				}
 				break
 			}
 			nb++
 		}
 		if nb != 2000 {
-			panic("wrong # rows")
+			b.Fatalf("wrong # rows: %d <> %d", 2000, nb)
 		}
 	}
 }
@@ -254,7 +254,7 @@ func BenchmarkYacrParser(b *testing.B) {
 			b.Fatal(err)
 		}
 		if nb != 2000 {
-			panic("wrong # rows")
+			b.Fatalf("wrong # rows: %d <> %d", 2000, nb)
 		}
 	}
 }
