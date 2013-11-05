@@ -3,40 +3,57 @@ package yacr_test
 import (
 	"fmt"
 	yacr "github.com/gwenn/yacr"
-	"io"
 	"os"
 	"strings"
 )
 
-func handle(err error) {
-	if err != nil {
-		panic(err)
+func Example() {
+	r := yacr.NewReader(os.Stdin, '\t', false)
+	w := yacr.NewWriter(os.Stdout, '\t', false)
+
+	for r.Scan() && w.Write(r.Bytes()) {
+		if r.EndOfRecord() {
+			w.EndOfRecord()
+		}
+	}
+	w.Flush()
+	if err := r.Err(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+	if err := w.Err(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 	}
 }
 
 func Example_reader() {
-	rdr := yacr.DefaultReader(strings.NewReader("c1,\"c\"\"2\",\"c\n3\",\"c,4\""))
-	defer rdr.Close()
-	for {
-		row, err := rdr.ReadRow()
-		if err != nil {
-			if err != io.EOF {
-				handle(err)
-			}
-			break
+	r := yacr.DefaultReader(strings.NewReader("c1,\"c\"\"2\",\"c\n3\",\"c,4\""))
+	fmt.Print("[")
+	for r.Scan() {
+		fmt.Print(string(r.Bytes()))
+		if r.EndOfRecord() {
+			fmt.Print("]\n")
+		} else {
+			fmt.Print(" ")
 		}
-		fmt.Printf("%s\n", row)
+	}
+	if err := r.Err(); err != nil {
+		fmt.Println(err)
 	}
 	// Output: [c1 c"2 c
 	// 3 c,4]
 }
 
 func Example_writer() {
-	wrtr := yacr.DefaultWriter(os.Stdout)
-	err := wrtr.Write([]string{"c1", "c\"2", "c\n3", "c,4"})
-	handle(err)
-	err = wrtr.Flush()
-	handle(err)
+	w := yacr.DefaultWriter(os.Stdout)
+	for _, field := range []string{"c1", "c\"2", "c\n3", "c,4"} {
+		if !w.Write([]byte(field)) { // TODO how to avoid copy?
+			break
+		}
+	}
+	w.Flush()
+	if err := w.Err(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
 	// Output: c1,"c""2","c
 	// 3","c,4"
 }

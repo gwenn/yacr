@@ -4,6 +4,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/gwenn/yacr"
 	"log"
 	"os"
@@ -24,18 +25,18 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	r := yacr.NewReader(os.Stdin, yacr.TAB, false)
-	/*null, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
-	if err != nil {
-		panic(err)
-	}
-	defer null.Close()
-	w := yacr.NewWriter(null, yacr.TAB, false)*/
-	for {
-		row := r.MustReadRow()
-		if row == nil {
-			break
+	r := yacr.NewReader(os.Stdin, '\t', false)
+	w := yacr.NewWriter(os.Stdout, '\t', false)
+	for r.Scan() && w.Write(r.Bytes()) {
+		if r.EndOfRecord() {
+			w.EndOfRecord()
 		}
-		//w.MustWriteRow(row)
+	}
+	w.Flush()
+	if err := r.Err(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
+	if err := w.Err(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 	}
 }
