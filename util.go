@@ -13,15 +13,6 @@ import (
 	"path"
 )
 
-func DeepCopy(row [][]byte) [][]byte {
-	dup := make([][]byte, len(row))
-	for i := 0; i < len(row); i++ {
-		dup[i] = make([]byte, len(row[i]))
-		copy(dup[i], row[i])
-	}
-	return dup
-}
-
 type zReadCloser struct {
 	f  *os.File
 	rd io.ReadCloser
