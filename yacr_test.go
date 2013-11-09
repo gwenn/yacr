@@ -105,6 +105,21 @@ func TestTwoValues(t *testing.T) {
 	}*/
 }
 
+func TestLastEmpty(t *testing.T) {
+	r := makeReader("Foo,Bar,\n", true)
+	n := 0
+	for r.Scan() {
+		n++
+		if r.EndOfRecord() {
+			break
+		}
+	}
+	if n != 3 {
+		t.Errorf("expecting %d values, got %d", 3, n)
+	}
+	checkNoError(t, r.Err())
+}
+
 func TestTwoLines(t *testing.T) {
 	row1 := strings.Repeat("1,2,3,4,5,6,7,8,9,10,", 5)
 	row2 := strings.Repeat("a,b,c,d,e,f,g,h,i,j,", 3)
@@ -115,7 +130,7 @@ func TestTwoLines(t *testing.T) {
 	checkValueCount(t, 51, values)
 	values = readRow(r)
 	checkNoError(t, r.Err())
-	checkValueCount(t, 30, values) // FIXME 31
+	checkValueCount(t, 31, values)
 }
 
 func TestLongLine(t *testing.T) {
@@ -123,7 +138,7 @@ func TestLongLine(t *testing.T) {
 	r := makeReader(content, true)
 	values := readRow(r)
 	checkNoError(t, r.Err())
-	checkValueCount(t, 2000, values) // FIXME 2001
+	checkValueCount(t, 2001, values)
 }
 
 func TestQuotedLine(t *testing.T) {
