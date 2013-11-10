@@ -21,7 +21,6 @@ type Reader struct {
 	quoted bool // specify if values may be quoted (when they contains separator or newline)
 	eor    bool // true when the most recent field has been terminated by a newline (not a separator).
 	line   int  // current line number (not record number)
-	shift  int  // when the last byte read is a comma => 1
 }
 
 // DefaultReader creates a "standard" CSV reader (separator is comma and quoted mode active)
@@ -31,7 +30,7 @@ func DefaultReader(rd io.Reader) *Reader {
 
 // NewReader returns a new CSV scanner to read from r.
 func NewReader(r io.Reader, sep byte, quoted bool) *Reader {
-	s := &Reader{bufio.NewScanner(r), sep, quoted, false, 1, 0}
+	s := &Reader{bufio.NewScanner(r), sep, quoted, true, 1}
 	s.Split(s.scanField)
 	return s
 }
@@ -46,8 +45,9 @@ func (s *Reader) scanField(data []byte, atEOF bool) (advance int, token []byte, 
 	if atEOF && len(data) == 0 {
 		return 0, nil, nil
 	}
-	shift := s.shift
-	if shift > 0 {
+	shift := 0
+	if !s.eor { // s.eor should be initialized to true to make this work.
+		shift = 1
 		data = data[shift:]
 	}
 	if s.quoted && len(data) > 0 && data[0] == '"' { // quoted field (may contains separator, newline and escaped quote)
@@ -67,15 +67,12 @@ func (s *Reader) scanField(data []byte, atEOF bool) (advance int, token []byte, 
 				}
 			}
 			if pc == '"' && c == s.sep {
-				s.shift = 1
 				s.eor = false
 				return i + shift, unescapeQuotes(data[1:i-1], escapedQuotes), nil
 			} else if pc == '"' && c == '\n' {
-				s.shift = 0
 				s.eor = true
 				return i + shift + 1, unescapeQuotes(data[1:i-1], escapedQuotes), nil
 			} else if c == '\n' && pc == '\r' && i >= 2 && data[i-2] == '"' {
-				s.shift = 0
 				s.eor = true
 				return i + shift + 1, unescapeQuotes(data[1:i-2], escapedQuotes), nil
 			}
@@ -86,7 +83,6 @@ func (s *Reader) scanField(data []byte, atEOF bool) (advance int, token []byte, 
 		}
 		if atEOF {
 			if c == '"' {
-				s.shift = 0
 				s.eor = true
 				return len(data) + shift, unescapeQuotes(data[1:len(data)-1], escapedQuotes), nil
 			}
@@ -97,11 +93,9 @@ func (s *Reader) scanField(data []byte, atEOF bool) (advance int, token []byte, 
 		// Scan until separator or newline, marking end of field.
 		for i, c := range data {
 			if c == s.sep {
-				s.shift = 1
 				s.eor = false
 				return i + shift, data[0:i], nil
 			} else if c == '\n' {
-				s.shift = 0
 				s.eor = true
 				s.line++
 				if i > 0 && data[i-1] == '\r' {
@@ -112,7 +106,6 @@ func (s *Reader) scanField(data []byte, atEOF bool) (advance int, token []byte, 
 		}
 		// If we're at EOF, we have a final, non-empty field. Return it.
 		if atEOF {
-			s.shift = 0
 			s.eor = true
 			return len(data) + shift, data, nil
 		}
