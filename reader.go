@@ -7,6 +7,7 @@ package yacr
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 )
@@ -19,18 +20,19 @@ type Reader struct {
 	*bufio.Scanner
 	sep    byte // values separator
 	quoted bool // specify if values may be quoted (when they contains separator or newline)
+	guess  bool // try to guess separator based on the file header
 	eor    bool // true when the most recent field has been terminated by a newline (not a separator).
 	line   int  // current line number (not record number)
 }
 
 // DefaultReader creates a "standard" CSV reader (separator is comma and quoted mode active)
 func DefaultReader(rd io.Reader) *Reader {
-	return NewReader(rd, ',', true)
+	return NewReader(rd, ',', true, false)
 }
 
 // NewReader returns a new CSV scanner to read from r.
-func NewReader(r io.Reader, sep byte, quoted bool) *Reader {
-	s := &Reader{bufio.NewScanner(r), sep, quoted, true, 1}
+func NewReader(r io.Reader, sep byte, quoted, guess bool) *Reader {
+	s := &Reader{bufio.NewScanner(r), sep, quoted, guess, true, 1}
 	s.Split(s.scanField)
 	return s
 }
@@ -44,6 +46,12 @@ func (s *Reader) EndOfRecord() bool {
 func (s *Reader) scanField(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if atEOF && len(data) == 0 {
 		return 0, nil, nil
+	}
+	if s.guess {
+		s.guess = false
+		if b := guess(data); b > 0 {
+			s.sep = b
+		}
 	}
 	shift := 0
 	if !s.eor { // s.eor should be initialized to true to make this work.
@@ -125,4 +133,25 @@ func unescapeQuotes(b []byte, count int) []byte {
 		}
 	}
 	return b[:len(b)-count]
+}
+
+func guess(data []byte) byte {
+	seps := []byte{',', ';', '\t', '|', ':'}
+	count := make(map[byte]uint)
+	for _, b := range data {
+		if bytes.IndexByte(seps, b) >= 0 {
+			count[b] += 1
+			/*} else if b == '\n' {
+			break*/
+		}
+	}
+	var max uint
+	var sep byte
+	for b, c := range count {
+		if c > max {
+			max = c
+			sep = b
+		}
+	}
+	return sep
 }

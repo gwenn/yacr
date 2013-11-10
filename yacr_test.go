@@ -15,7 +15,7 @@ import (
 )
 
 func makeReader(s string, quoted bool) *Reader {
-	return NewReader(strings.NewReader(s), ',', quoted)
+	return NewReader(strings.NewReader(s), ',', quoted, false)
 }
 
 func readRow(r *Reader) []string {
@@ -168,18 +168,17 @@ func TestEmbeddedNewline(t *testing.T) {
 	checkEquals(t, expected, values)
 }
 
-/*func TestGuess(t *testing.T) {
-	r := makeReader("a,b;c\td:e|f;g", false)
-	r.Guess = true
+func TestGuess(t *testing.T) {
+	r := NewReader(strings.NewReader("a,b;c\td:e|f;g"), ',', true, true)
 	values := readRow(r)
 	checkNoError(t, r.Err())
-	if ';' != r.Sep {
+	/*if ';' != r.Sep {
 		t.Errorf("Expected '%q', got '%q'", ';', r.Sep)
-	}
+	}*/
 	checkValueCount(t, 3, values)
 	expected := []string{"a,b", "c\td:e|f", "g"}
 	checkEquals(t, expected, values)
-}*/
+}
 
 func TestWriter(t *testing.T) {
 	out := bytes.NewBuffer(nil)
