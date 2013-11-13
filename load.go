@@ -25,7 +25,7 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	r := yacr.NewReader(os.Stdin, '\t', false)
+	r := yacr.NewReader(os.Stdin, '\t', false, false)
 	w := yacr.NewWriter(os.Stdout, '\t', false)
 	for r.Scan() && w.Write(r.Bytes()) {
 		if r.EndOfRecord() {
