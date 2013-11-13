@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Yet another CSV reader (and writer) with small memory usage.
+// Package yacr is yet another CSV reader (and writer) with small memory usage.
 package yacr
 
 import (

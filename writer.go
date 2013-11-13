@@ -9,7 +9,10 @@ import (
 	"io"
 )
 
-// CSV writer
+// Writer provides an interface for writing CSV data
+// (compatible with rfc4180 and extended with the option of having a separator other than ",").
+// Successive calls to the Write method will automatically insert the separator.
+// The EndOfRecord method tells when a line break is inserted.
 type Writer struct {
 	b      *bufio.Writer
 	sep    byte  // values separator

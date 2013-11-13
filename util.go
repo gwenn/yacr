@@ -18,8 +18,7 @@ type zReadCloser struct {
 	rd io.ReadCloser
 }
 
-// TODO Create golang bindings for zlib (gzopen) or libarchive?
-// Check 'mime' package
+// Zopen transparently opens gzip/bzip files (based on their extension).
 func Zopen(filepath string) (io.ReadCloser, error) {
 	f, err := os.Open(filepath)
 	if err != nil {
