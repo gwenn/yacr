@@ -180,6 +180,16 @@ func TestGuess(t *testing.T) {
 	checkEquals(t, expected, values)
 }
 
+func TestTrim(t *testing.T) {
+	r := makeReader(" a,b ,\" c \", d ", true)
+	r.Trim = true
+	values := readRow(r)
+	checkNoError(t, r.Err())
+	checkValueCount(t, 4, values)
+	expected := []string{"a", "b", " c ", "d"}
+	checkEquals(t, expected, values)
+}
+
 func TestWriter(t *testing.T) {
 	out := bytes.NewBuffer(nil)
 	w := DefaultWriter(out)

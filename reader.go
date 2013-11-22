@@ -23,6 +23,7 @@ type Reader struct {
 	guess  bool // try to guess separator based on the file header
 	eor    bool // true when the most recent field has been terminated by a newline (not a separator).
 	line   int  // current line number (not record number)
+	Trim   bool // trim spaces (only on not-quoted values)
 }
 
 // DefaultReader creates a "standard" CSV reader (separator is comma and quoted mode active)
@@ -32,7 +33,7 @@ func DefaultReader(rd io.Reader) *Reader {
 
 // NewReader returns a new CSV scanner to read from r.
 func NewReader(r io.Reader, sep byte, quoted, guess bool) *Reader {
-	s := &Reader{bufio.NewScanner(r), sep, quoted, guess, true, 1}
+	s := &Reader{bufio.NewScanner(r), sep, quoted, guess, true, 1, false}
 	s.Split(s.scanField)
 	return s
 }
@@ -102,12 +103,21 @@ func (s *Reader) scanField(data []byte, atEOF bool) (advance int, token []byte, 
 		for i, c := range data {
 			if c == s.sep {
 				s.eor = false
+				if s.Trim {
+					return i + shift, trim(data[0:i]), nil
+				}
 				return i + shift, data[0:i], nil
 			} else if c == '\n' {
 				s.eor = true
 				s.line++
 				if i > 0 && data[i-1] == '\r' {
+					if s.Trim {
+						return i + shift + 1, trim(data[0 : i-1]), nil
+					}
 					return i + shift + 1, data[0 : i-1], nil
+				}
+				if s.Trim {
+					return i + shift + 1, trim(data[0:i]), nil
 				}
 				return i + shift + 1, data[0:i], nil
 			}
@@ -115,6 +125,10 @@ func (s *Reader) scanField(data []byte, atEOF bool) (advance int, token []byte, 
 		// If we're at EOF, we have a final, non-empty field. Return it.
 		if atEOF {
 			s.eor = true
+			if s.Trim {
+				l := len(data)
+				return l + shift, trim(data), nil
+			}
 			return len(data) + shift, data, nil
 		}
 	}
@@ -154,4 +168,13 @@ func guess(data []byte) byte {
 		}
 	}
 	return sep
+}
+
+// bytes.TrimSpace may return nil...
+func trim(s []byte) []byte {
+	t := bytes.TrimSpace(s)
+	if t == nil {
+		return s
+	}
+	return t
 }
