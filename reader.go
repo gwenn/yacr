@@ -23,7 +23,10 @@ type Reader struct {
 	guess  bool // try to guess separator based on the file header
 	eor    bool // true when the most recent field has been terminated by a newline (not a separator).
 	line   int  // current line number (not record number)
-	Trim   bool // trim spaces (only on not-quoted values)
+	empty  bool // true when the current line is empty (or a line comment)
+
+	Trim    bool // trim spaces (only on not-quoted values). Break rfc4180 rule: "Spaces are considered part of a field and should not be ignored."
+	Comment byte // character marking the start of a line comment. When specified, line comment appears as empty line.
 }
 
 // DefaultReader creates a "standard" CSV reader (separator is comma and quoted mode active)
@@ -33,7 +36,7 @@ func DefaultReader(rd io.Reader) *Reader {
 
 // NewReader returns a new CSV scanner to read from r.
 func NewReader(r io.Reader, sep byte, quoted, guess bool) *Reader {
-	s := &Reader{bufio.NewScanner(r), sep, quoted, guess, true, 1, false}
+	s := &Reader{bufio.NewScanner(r), sep, quoted, guess, true, 1, false, false, 0}
 	s.Split(s.scanField)
 	return s
 }
@@ -41,6 +44,11 @@ func NewReader(r io.Reader, sep byte, quoted, guess bool) *Reader {
 // EndOfRecord returns true when the most recent field has been terminated by a newline (not a separator).
 func (s *Reader) EndOfRecord() bool {
 	return s.eor
+}
+
+// EmptyLine returns true when the current line is empty or a line comment.
+func (s *Reader) EmptyLine() bool {
+	return s.empty && s.eor
 }
 
 // Lexing adapted from csv_read_one_field function in SQLite3 shell sources.
@@ -60,6 +68,7 @@ func (s *Reader) scanField(data []byte, atEOF bool) (advance int, token []byte, 
 		data = data[shift:]
 	}
 	if s.quoted && len(data) > 0 && data[0] == '"' { // quoted field (may contains separator, newline and escaped quote)
+		s.empty = false
 		startLine := s.line
 		escapedQuotes := 0
 		var c, pc byte
@@ -98,6 +107,16 @@ func (s *Reader) scanField(data []byte, atEOF bool) (advance int, token []byte, 
 			// If we're at EOF, we have a non-terminated field.
 			return 0, nil, fmt.Errorf("non-terminated quoted field at line %d", startLine)
 		}
+	} else if s.eor && s.Comment != 0 && len(data) > 0 && data[0] == s.Comment { // line comment
+		s.empty = true
+		for i, c := range data {
+			if c == '\n' {
+				return i + shift + 1, nil, nil
+			}
+		}
+		if atEOF {
+			return len(data) + shift, nil, nil
+		}
 	} else { // non-quoted field
 		// Scan until separator or newline, marking end of field.
 		for i, c := range data {
@@ -108,14 +127,17 @@ func (s *Reader) scanField(data []byte, atEOF bool) (advance int, token []byte, 
 				}
 				return i + shift, data[0:i], nil
 			} else if c == '\n' {
-				s.eor = true
 				s.line++
 				if i > 0 && data[i-1] == '\r' {
+					s.empty = s.eor && i == 1
+					s.eor = true
 					if s.Trim {
 						return i + shift + 1, trim(data[0 : i-1]), nil
 					}
 					return i + shift + 1, data[0 : i-1], nil
 				}
+				s.empty = s.eor && i == 0
+				s.eor = true
 				if s.Trim {
 					return i + shift + 1, trim(data[0:i]), nil
 				}
@@ -124,6 +146,7 @@ func (s *Reader) scanField(data []byte, atEOF bool) (advance int, token []byte, 
 		}
 		// If we're at EOF, we have a final, non-empty field. Return it.
 		if atEOF {
+			s.empty = false
 			s.eor = true
 			if s.Trim {
 				l := len(data)
@@ -174,7 +197,7 @@ func guess(data []byte) byte {
 func trim(s []byte) []byte {
 	t := bytes.TrimSpace(s)
 	if t == nil {
-		return s
+		return s[0:0]
 	}
 	return t
 }

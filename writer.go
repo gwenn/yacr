@@ -19,6 +19,8 @@ type Writer struct {
 	quoted bool  // specify if values should be quoted (when they contain a separator or a newline)
 	sor    bool  // true at start of record
 	err    error // sticky error.
+
+	UseCRLF bool // True to use \r\n as the line terminator
 }
 
 // DefaultWriter creates a "standard" CSV writer (separator is comma and quoted mode active)
@@ -77,7 +79,10 @@ func (w *Writer) Write(field []byte) bool {
 
 // EndOfRecord tells when a line break must be inserted.
 func (w *Writer) EndOfRecord() {
-	w.setErr(w.b.WriteByte('\n')) // TODO \r\n ?
+	if w.UseCRLF {
+		w.setErr(w.b.WriteByte('\r'))
+	}
+	w.setErr(w.b.WriteByte('\n'))
 	w.sor = true
 }
 

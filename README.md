@@ -8,9 +8,9 @@ Yet another CSV reader (and writer) with small memory usage.
 There is a standard package named [encoding/csv](http://tip.golang.org/pkg/encoding/csv/).
 
 <pre>
-BenchmarkParsing	    5000	    517865 ns/op	 189.24 MB/s	    4846 B/op	       5 allocs/op
-BenchmarkQuotedParsing	    1000	   1953146 ns/op	  52.22 MB/s	    4876 B/op	       6 allocs/op
-BenchmarkEmbeddedNL	    1000	   2122613 ns/op	  56.53 MB/s	    4874 B/op	       6 allocs/op
-BenchmarkStdParser	     500	   7252599 ns/op	  16.55 MB/s	  657876 B/op	   18132 allocs/op
-BenchmarkYacrParser	    2000	   1354770 ns/op	  88.58 MB/s	    4875 B/op	       6 allocs/op
+BenchmarkParsing	    5000	    363800 ns/op	 269.38 MB/s	    4289 B/op	       5 allocs/op
+BenchmarkQuotedParsing	    5000	    517815 ns/op	 196.98 MB/s	    4289 B/op	       5 allocs/op
+BenchmarkEmbeddedNL	    5000	    583565 ns/op	 205.63 MB/s	    4289 B/op	       5 allocs/op
+BenchmarkStdParser	     500	   5277088 ns/op	  22.74 MB/s	  649978 B/op	   18124 allocs/op
+BenchmarkYacrParser	    5000	    583447 ns/op	 205.67 MB/s	    4289 B/op	       5 allocs/op
 </pre>

@@ -5,10 +5,7 @@
 package yacr_test
 
 import (
-	"bytes"
-	"encoding/csv"
 	. "github.com/gwenn/yacr"
-	"io"
 	"reflect"
 	"strings"
 	"testing"
@@ -21,21 +18,15 @@ func makeReader(s string, quoted bool) *Reader {
 func readRow(r *Reader) []string {
 	row := make([]string, 0, 10)
 	for r.Scan() {
+		if r.EmptyLine() { // skip empty line (or line comment)
+			continue
+		}
 		row = append(row, r.Text())
 		if r.EndOfRecord() {
 			break
 		}
 	}
 	return row
-}
-
-func writeRow(w *Writer, row []string) {
-	for _, field := range row {
-		if !w.Write([]byte(field)) {
-			break
-		}
-	}
-	w.EndOfRecord()
 }
 
 func checkValueCount(t *testing.T, expected int, values []string) {
@@ -190,95 +181,27 @@ func TestTrim(t *testing.T) {
 	checkEquals(t, expected, values)
 }
 
-func TestWriter(t *testing.T) {
-	out := bytes.NewBuffer(nil)
-	w := DefaultWriter(out)
-	writeRow(w, []string{"a", "b,\n", "c\"d"})
-	checkNoError(t, w.Err())
-	w.Flush()
-	checkNoError(t, w.Err())
-	expected := "a,\"b,\n\",\"c\"\"d\"\n"
-	line := out.String()
-	if expected != line {
-		t.Errorf("Expected '%s', got '%s'", expected, line)
+func TestLineComment(t *testing.T) {
+	r := makeReader("a,#\n# comment\nb\n# comment", true)
+	r.Comment = '#'
+	values := readRow(r)
+	checkNoError(t, r.Err())
+	checkEquals(t, []string{"a", "#"}, values)
+	values = readRow(r)
+	checkNoError(t, r.Err())
+	checkEquals(t, []string{"b"}, values)
+	if r.Scan() {
+		t.Error("expected no value")
 	}
+	checkNoError(t, r.Err())
 }
 
-func BenchmarkParsing(b *testing.B) {
-	benchmarkParsing(b, "aaaaaaaa,b b b b b b b,cc cc cc cc cc, ddddd ddd\n", false)
-}
-func BenchmarkQuotedParsing(b *testing.B) {
-	benchmarkParsing(b, "aaaaaaaa,b b b b b b b,\"cc cc cc,cc\",cc, ddddd ddd\n", true)
-}
-func BenchmarkEmbeddedNL(b *testing.B) {
-	benchmarkParsing(b, "aaaaaaaa,b b b b b b b,\"fo \n oo\",\"c oh c yes c \", ddddd ddd\n", true)
-}
-
-func benchmarkParsing(b *testing.B, s string, quoted bool) {
-	b.StopTimer()
-	str := strings.Repeat(s, 2000)
-	b.SetBytes(int64(len(str)))
-	b.StartTimer()
-	for i := 0; i < b.N; i++ {
-		r := makeReader(str, quoted)
-		nb := 0
-		for r.Scan() {
-			if r.EndOfRecord() {
-				nb++
-			}
-		}
-		if err := r.Err(); err != nil {
-			b.Fatal(err)
-		}
-		if nb != 2000 {
-			b.Fatalf("wrong # rows: %d <> %d", 2000, nb)
-		}
-	}
-}
-
-func BenchmarkStdParser(b *testing.B) {
-	b.StopTimer()
-	s := strings.Repeat("aaaaaaaa,b b b b b b b,\"fo \n oo\",\"c oh c yes c \", ddddd ddd\n", 2000)
-	b.SetBytes(int64(len(s)))
-	b.StartTimer()
-	for i := 0; i < b.N; i++ {
-		r := csv.NewReader(strings.NewReader(s))
-		//r.TrailingComma = true
-		nb := 0
-		for {
-			_, err := r.Read()
-			if err != nil {
-				if err != io.EOF {
-					b.Fatal(err)
-				}
-				break
-			}
-			nb++
-		}
-		if nb != 2000 {
-			b.Fatalf("wrong # rows: %d <> %d", 2000, nb)
-		}
-	}
-}
-
-func BenchmarkYacrParser(b *testing.B) {
-	b.StopTimer()
-	s := strings.Repeat("aaaaaaaa,b b b b b b b,\"fo \n oo\",\"c oh c yes c \", ddddd ddd\n", 2000)
-	b.SetBytes(int64(len(s)))
-	b.StartTimer()
-	for i := 0; i < b.N; i++ {
-		r := DefaultReader(strings.NewReader(s))
-		nb := 0
-		for r.Scan() {
-			if r.EndOfRecord() {
-				nb++
-			}
-		}
-		if err := r.Err(); err != nil {
-			b.Fatal(err)
-		}
-		if nb != 2000 {
-			b.Fatalf("wrong # rows: %d <> %d", 2000, nb)
-		}
-	}
+func TestEmptyLine(t *testing.T) {
+	r := makeReader("a,b,c\n\nd,e,f", true)
+	values := readRow(r)
+	checkNoError(t, r.Err())
+	checkValueCount(t, 3, values)
+	values = readRow(r)
+	checkNoError(t, r.Err())
+	checkValueCount(t, 3, values)
 }
