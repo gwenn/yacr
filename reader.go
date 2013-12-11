@@ -71,7 +71,7 @@ func (s *Reader) scanField(data []byte, atEOF bool) (advance int, token []byte, 
 		s.empty = false
 		startLine := s.line
 		escapedQuotes := 0
-		var c, pc byte
+		var c, pc, ppc byte
 		// Scan until the separator or newline following the closing quote (and ignore escaped quote)
 		for i := 1; i < len(data); i++ {
 			c = data[i]
@@ -90,13 +90,14 @@ func (s *Reader) scanField(data []byte, atEOF bool) (advance int, token []byte, 
 			} else if pc == '"' && c == '\n' {
 				s.eor = true
 				return i + shift + 1, unescapeQuotes(data[1:i-1], escapedQuotes), nil
-			} else if c == '\n' && pc == '\r' && i >= 2 && data[i-2] == '"' {
+			} else if c == '\n' && pc == '\r' && ppc == '"' {
 				s.eor = true
 				return i + shift + 1, unescapeQuotes(data[1:i-2], escapedQuotes), nil
 			}
 			if pc == '"' && c != '\r' {
 				return 0, nil, fmt.Errorf("unescaped %c character at line %d", pc, s.line)
 			}
+			ppc = pc
 			pc = c
 		}
 		if atEOF {

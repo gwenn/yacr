@@ -142,7 +142,7 @@ func TestQuotedLine(t *testing.T) {
 }
 
 func TestEscapedQuoteLine(t *testing.T) {
-	r := makeReader("\"a\",b,\"c\"\"d\"", true)
+	r := makeReader(`"a",b,"c""d"`, true)
 	values := readRow(r)
 	checkNoError(t, r.Err())
 	checkValueCount(t, 3, values)
@@ -159,6 +159,15 @@ func TestEmbeddedNewline(t *testing.T) {
 	checkEquals(t, expected, values)
 }
 
+func TestEscapedQuoteAndEmbeddedNewLine(t *testing.T) {
+	r := makeReader("\"a\"\"b\",\"c\"\"\r\nd\"", true)
+	values := readRow(r)
+	checkNoError(t, r.Err())
+	checkValueCount(t, 2, values)
+	expected := []string{"a\"b", "c\"\r\nd"}
+	checkEquals(t, expected, values)
+}
+
 func TestGuess(t *testing.T) {
 	r := NewReader(strings.NewReader("a,b;c\td:e|f;g"), ',', true, true)
 	values := readRow(r)
@@ -172,7 +181,7 @@ func TestGuess(t *testing.T) {
 }
 
 func TestTrim(t *testing.T) {
-	r := makeReader(" a,b ,\" c \", d ", true)
+	r := makeReader(` a,b ," c ", d `, true)
 	r.Trim = true
 	values := readRow(r)
 	checkNoError(t, r.Err())
