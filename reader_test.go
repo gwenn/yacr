@@ -5,10 +5,10 @@
 package yacr_test
 
 import (
-	. "github.com/gwenn/yacr"
 	"reflect"
 	"strings"
 	"testing"
+	. "github.com/gwenn/yacr"
 )
 
 func makeReader(s string, quoted bool) *Reader {
@@ -172,9 +172,9 @@ func TestGuess(t *testing.T) {
 	r := NewReader(strings.NewReader("a,b;c\td:e|f;g"), ',', true, true)
 	values := readRow(r)
 	checkNoError(t, r.Err())
-	/*if ';' != r.Sep {
-		t.Errorf("Expected '%q', got '%q'", ';', r.Sep)
-	}*/
+	if ';' != r.Sep() {
+		t.Errorf("Expected '%q', got '%q'", ';', r.Sep())
+	}
 	checkValueCount(t, 3, values)
 	expected := []string{"a,b", "c\td:e|f", "g"}
 	checkEquals(t, expected, values)

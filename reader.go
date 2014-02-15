@@ -51,6 +51,11 @@ func (s *Reader) EmptyLine() bool {
 	return s.empty && s.eor
 }
 
+// Sep returns the values separator used/guessed
+func (s *Reader) Sep() byte {
+	return s.sep
+}
+
 // Lexing adapted from csv_read_one_field function in SQLite3 shell sources.
 func (s *Reader) scanField(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if atEOF && len(data) == 0 {
@@ -178,7 +183,7 @@ func guess(data []byte) byte {
 	count := make(map[byte]uint)
 	for _, b := range data {
 		if bytes.IndexByte(seps, b) >= 0 {
-			count[b] += 1
+			count[b]++
 			/*} else if b == '\n' {
 			break*/
 		}
