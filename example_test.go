@@ -2,9 +2,10 @@ package yacr_test
 
 import (
 	"fmt"
-	yacr "github.com/gwenn/yacr"
 	"os"
 	"strings"
+
+	yacr "github.com/gwenn/yacr"
 )
 
 func Example() {
@@ -29,7 +30,7 @@ func Example_reader() {
 	r := yacr.DefaultReader(strings.NewReader("c1,\"c\"\"2\",\"c\n3\",\"c,4\""))
 	fmt.Print("[")
 	for r.Scan() {
-		fmt.Print(string(r.Bytes()))
+		fmt.Print(r.Text())
 		if r.EndOfRecord() {
 			fmt.Print("]\n")
 		} else {

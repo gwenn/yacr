@@ -37,7 +37,7 @@ func DefaultReader(rd io.Reader) *Reader {
 // NewReader returns a new CSV scanner to read from r.
 func NewReader(r io.Reader, sep byte, quoted, guess bool) *Reader {
 	s := &Reader{bufio.NewScanner(r), sep, quoted, guess, true, 1, false, false, 0}
-	s.Split(s.scanField)
+	s.Split(s.ScanField)
 	return s
 }
 
@@ -57,7 +57,7 @@ func (s *Reader) Sep() byte {
 }
 
 // Lexing adapted from csv_read_one_field function in SQLite3 shell sources.
-func (s *Reader) scanField(data []byte, atEOF bool) (advance int, token []byte, err error) {
+func (s *Reader) ScanField(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if atEOF && len(data) == 0 {
 		return 0, nil, nil
 	}
