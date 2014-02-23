@@ -5,10 +5,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/gwenn/yacr"
 	"log"
 	"os"
 	"runtime/pprof"
+
+	"github.com/gwenn/yacr"
 )
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
