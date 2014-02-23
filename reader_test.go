@@ -206,7 +206,17 @@ func TestLineComment(t *testing.T) {
 }
 
 func TestEmptyLine(t *testing.T) {
-	r := makeReader("a,b,c\n\nd,e,f", true)
+	r := makeReader("a,b,\"c\"\n\nd,e,f", true)
+	values := readRow(r)
+	checkNoError(t, r.Err())
+	checkValueCount(t, 3, values)
+	values = readRow(r)
+	checkNoError(t, r.Err())
+	checkValueCount(t, 3, values)
+}
+
+func TestWindowsEndOfLine(t *testing.T) {
+	r := makeReader("a,b,c\r\nd,e,\"f\"\r\n", true)
 	values := readRow(r)
 	checkNoError(t, r.Err())
 	checkValueCount(t, 3, values)
