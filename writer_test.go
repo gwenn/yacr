@@ -6,8 +6,8 @@ package yacr_test
 
 import (
 	"bytes"
-	. "github.com/gwenn/yacr"
 	"testing"
+	. "github.com/gwenn/yacr"
 )
 
 func writeRow(w *Writer, row []string) {
@@ -29,6 +29,6 @@ func TestWriter(t *testing.T) {
 	expected := "a,\"b,\n\",\"c\"\"d\"\n"
 	line := out.String()
 	if expected != line {
-		t.Errorf("Expected '%s', got '%s'", expected, line)
+		t.Errorf("got '%s'; want '%s'", line, expected)
 	}
 }

@@ -6,10 +6,10 @@ package yacr_test
 
 import (
 	"encoding/csv"
-	. "github.com/gwenn/yacr"
 	"io"
 	"strings"
 	"testing"
+	. "github.com/gwenn/yacr"
 )
 
 func BenchmarkParsing(b *testing.B) {
@@ -39,7 +39,7 @@ func benchmarkParsing(b *testing.B, s string, quoted bool) {
 			b.Fatal(err)
 		}
 		if nb != 2000 {
-			b.Fatalf("wrong # rows: %d <> %d", 2000, nb)
+			b.Fatalf("wrong # rows: %d; want %d", nb, 2000)
 		}
 	}
 }
@@ -64,7 +64,7 @@ func BenchmarkStdParser(b *testing.B) {
 			nb++
 		}
 		if nb != 2000 {
-			b.Fatalf("wrong # rows: %d <> %d", 2000, nb)
+			b.Fatalf("wrong # rows: %d; want %d", nb, 2000)
 		}
 	}
 }
@@ -86,7 +86,7 @@ func BenchmarkYacrParser(b *testing.B) {
 			b.Fatal(err)
 		}
 		if nb != 2000 {
-			b.Fatalf("wrong # rows: %d <> %d", 2000, nb)
+			b.Fatalf("wrong # rows: %d; want %d", nb, 2000)
 		}
 	}
 }

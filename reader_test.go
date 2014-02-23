@@ -31,7 +31,7 @@ func readRow(r *Reader) []string {
 
 func checkValueCount(t *testing.T, expected int, values []string) {
 	if len(values) != expected {
-		t.Errorf("Expected %d value(s), but got %d (%#v)", expected, len(values), values)
+		t.Errorf("got %d value(s) (%#v); want %d", len(values), values, expected)
 	}
 }
 
@@ -43,7 +43,7 @@ func checkNoError(t *testing.T, e error) {
 
 func checkEquals(t *testing.T, expected, actual []string) {
 	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("Expected %#v, got %#v", expected, actual)
+		t.Errorf("got %#v; want %#v", actual, expected)
 	}
 }
 
@@ -56,7 +56,7 @@ func TestSingleValue(t *testing.T) {
 	}
 	checkNoError(t, r.Err())
 	if expected != r.Text() {
-		t.Errorf("expected: %q, got: %q", expected, r.Text())
+		t.Errorf("Got: %q; want: %q", r.Text(), expected)
 	}
 	ok = r.Scan()
 	if ok {
@@ -76,7 +76,7 @@ func TestTwoValues(t *testing.T) {
 	}
 	checkNoError(t, r.Err())
 	if "Foo" != r.Text() {
-		t.Errorf("expected: %q, got: %q", "Foo", r.Text())
+		t.Errorf("got: %q; want: %q", r.Text(), "Foo")
 	}
 	ok = r.Scan()
 	if !ok {
@@ -84,7 +84,7 @@ func TestTwoValues(t *testing.T) {
 	}
 	checkNoError(t, r.Err())
 	if "Bar" != r.Text() {
-		t.Errorf("expected: %q, got: %q", "Bar", r.Text())
+		t.Errorf("got: %q; want: %q", r.Text(), "Bar")
 	}
 	ok = r.Scan()
 	if ok {
@@ -106,7 +106,7 @@ func TestLastEmpty(t *testing.T) {
 		}
 	}
 	if n != 3 {
-		t.Errorf("expecting %d values, got %d", 3, n)
+		t.Errorf("got %d values; want %d", n, 3)
 	}
 	checkNoError(t, r.Err())
 }
@@ -173,7 +173,7 @@ func TestGuess(t *testing.T) {
 	values := readRow(r)
 	checkNoError(t, r.Err())
 	if ';' != r.Sep() {
-		t.Errorf("Expected '%q', got '%q'", ';', r.Sep())
+		t.Errorf("got '%q'; want '%q'", r.Sep(), ';')
 	}
 	checkValueCount(t, 3, values)
 	expected := []string{"a,b", "c\td:e|f", "g"}
