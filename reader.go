@@ -56,7 +56,8 @@ func (s *Reader) Sep() byte {
 	return s.sep
 }
 
-// Lexing adapted from csv_read_one_field function in SQLite3 shell sources.
+// ScanField implements bufio.SplitFunc for CSV.
+// Lexing is adapted from csv_read_one_field function in SQLite3 shell sources.
 func (s *Reader) ScanField(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if atEOF && len(data) == 0 {
 		return 0, nil, nil
