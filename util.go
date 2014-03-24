@@ -30,6 +30,7 @@ func Zopen(filepath string) (io.ReadCloser, error) {
 	if ext == ".gz" {
 		rd, err = gzip.NewReader(f)
 		if err != nil {
+			_ = f.Close()
 			return nil, err
 		}
 	} else if ext == ".bz2" {
@@ -45,6 +46,7 @@ func (z *zReadCloser) Read(b []byte) (n int, err error) {
 func (z *zReadCloser) Close() (err error) {
 	err = z.rd.Close()
 	if err != nil {
+		_ = z.f.Close()
 		return
 	}
 	return z.f.Close()
