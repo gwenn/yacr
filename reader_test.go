@@ -47,83 +47,6 @@ func checkEquals(t *testing.T, expected, actual []string) {
 	}
 }
 
-func TestSingleValue(t *testing.T) {
-	expected := "Foo"
-	r := makeReader(expected, true)
-	ok := r.Scan()
-	if !ok {
-		t.Error("expected one value")
-	}
-	checkNoError(t, r.Err())
-	if expected != r.Text() {
-		t.Errorf("Got: %q; want: %q", r.Text(), expected)
-	}
-	ok = r.Scan()
-	if ok {
-		t.Error("expected no value")
-	}
-	checkNoError(t, r.Err())
-	/*if len(r.Text()) != 0 {
-		t.Errorf("expected no value, got: %q", r.Text())
-	}*/
-}
-
-func TestTwoValues(t *testing.T) {
-	r := makeReader("Foo,Bar", true)
-	ok := r.Scan()
-	if !ok {
-		t.Error("expected one value")
-	}
-	checkNoError(t, r.Err())
-	if "Foo" != r.Text() {
-		t.Errorf("got: %q; want: %q", r.Text(), "Foo")
-	}
-	ok = r.Scan()
-	if !ok {
-		t.Error("expected another value")
-	}
-	checkNoError(t, r.Err())
-	if "Bar" != r.Text() {
-		t.Errorf("got: %q; want: %q", r.Text(), "Bar")
-	}
-	ok = r.Scan()
-	if ok {
-		t.Error("expected no value")
-	}
-	checkNoError(t, r.Err())
-	/*if len(r.Text()) != 0 {
-		t.Errorf("expected no value, got: %q", r.Text())
-	}*/
-}
-
-func TestLastEmpty(t *testing.T) {
-	r := makeReader("Foo,Bar,\n", true)
-	n := 0
-	for r.Scan() {
-		n++
-		if r.EndOfRecord() {
-			break
-		}
-	}
-	if n != 3 {
-		t.Errorf("got %d values; want %d", n, 3)
-	}
-	checkNoError(t, r.Err())
-}
-
-func TestTwoLines(t *testing.T) {
-	row1 := strings.Repeat("1,2,3,4,5,6,7,8,9,10,", 5)
-	row2 := strings.Repeat("a,b,c,d,e,f,g,h,i,j,", 3)
-	content := strings.Join([]string{row1, row2}, "\n")
-	r := makeReader(content, true)
-	values := readRow(r)
-	checkNoError(t, r.Err())
-	checkValueCount(t, 51, values)
-	values = readRow(r)
-	checkNoError(t, r.Err())
-	checkValueCount(t, 31, values)
-}
-
 func TestLongLine(t *testing.T) {
 	content := strings.Repeat("1,2,3,4,5,6,7,8,9,10,", 200)
 	r := makeReader(content, true)
@@ -132,95 +55,295 @@ func TestLongLine(t *testing.T) {
 	checkValueCount(t, 2001, values)
 }
 
-func TestQuotedLine(t *testing.T) {
-	r := makeReader("\"a\",b,\"c,d\"", true)
-	values := readRow(r)
-	checkNoError(t, r.Err())
-	checkValueCount(t, 3, values)
-	expected := []string{"a", "b", "c,d"}
-	checkEquals(t, expected, values)
+var readTests = []struct {
+	Name   string
+	Input  string
+	Output [][]string
+
+	// These fields are copied into the Reader
+	Comma   byte
+	Quoted  bool
+	Guess   byte
+	Trim    bool
+	Comment byte
+
+	Error  string
+	Line   int // Expected error line if != 0
+	Column int // Expected error column if line != 0
+}{
+	{
+		Name:   "Simple",
+		Input:  "a,b,c\n",
+		Output: [][]string{{"a", "b", "c"}},
+	},
+	{
+		Name:   "CRLF",
+		Input:  "a,b\r\nc,d\r\n",
+		Output: [][]string{{"a", "b"}, {"c", "d"}},
+	},
+	{
+		Name:   "CRLFQuoted",
+		Quoted: true,
+		Input:  "a,b\r\nc,\"d\"\r\n",
+		Output: [][]string{{"a", "b"}, {"c", "d"}},
+	},
+	{
+		Name:   "BareCR",
+		Input:  "a,b\rc,d\r\n",
+		Output: [][]string{{"a", "b\rc", "d"}},
+	},
+	{
+		Name: "RFC4180test",
+		Input: `#field1,field2,field3
+"aaa","bb
+b","ccc"
+"a,a","b""bb","ccc"
+zzz,yyy,xxx
+`,
+		Quoted: true,
+		Output: [][]string{
+			{"#field1", "field2", "field3"},
+			{"aaa", "bb\nb", "ccc"},
+			{"a,a", `b"bb`, "ccc"},
+			{"zzz", "yyy", "xxx"},
+		},
+	},
+	{
+		Name:   "NoEOLTest",
+		Input:  "a,b,c",
+		Output: [][]string{{"a", "b", "c"}},
+	},
+	{
+		Name:   "Semicolon",
+		Comma:  ';',
+		Input:  "a;b;c\n",
+		Output: [][]string{{"a", "b", "c"}},
+	},
+	{
+		Name: "MultiLine",
+		Input: `"two
+line","one line","three
+line
+field"`,
+		Quoted: true,
+		Output: [][]string{{"two\nline", "one line", "three\nline\nfield"}},
+	},
+	{
+		Name: "EmbeddedNewline",
+		Input: `a,"b
+b","c
+
+",d`,
+		Quoted: true,
+		Output: [][]string{{"a", "b\nb", "c\n\n", "d"}},
+	},
+	{
+		Name:   "EscapedQuoteAndEmbeddedNewLine",
+		Input:  "\"a\"\"b\",\"c\"\"\r\nd\"",
+		Quoted: true,
+		Output: [][]string{{"a\"b", "c\"\r\nd"}},
+	},
+	{
+		Name:   "BlankLine",
+		Quoted: true,
+		Input:  "a,b,\"c\"\n\nd,e,f\n\n",
+		Output: [][]string{
+			{"a", "b", "c"},
+			{"d", "e", "f"},
+		},
+	},
+	{
+		Name:   "TrimSpace",
+		Input:  " a,  b,   c\n",
+		Trim:   true,
+		Output: [][]string{{"a", "b", "c"}},
+	},
+	{
+		Name:   "TrimSpaceQuoted",
+		Quoted: true,
+		Input:  " a,b ,\" c \", d \n",
+		Trim:   true,
+		Output: [][]string{{"a", "b", " c ", "d"}},
+	},
+	{
+		Name:   "LeadingSpace",
+		Input:  " a,  b,   c\n",
+		Output: [][]string{{" a", "  b", "   c"}},
+	},
+	{
+		Name:    "Comment",
+		Comment: '#',
+		Input:   "#1,2,3\na,b,#\n#comment\nc\n# comment",
+		Output:  [][]string{{"a", "b", "#"}, {"c"}},
+	},
+	{
+		Name:   "NoComment",
+		Input:  "#1,2,3\na,b,c",
+		Output: [][]string{{"#1", "2", "3"}, {"a", "b", "c"}},
+	},
+	{
+		Name:   "LazyQuotes", // differs
+		Quoted: true,
+		Input:  `a "word","1"2",a","b`,
+		Output: [][]string{{`a "word"`, `1"2`, `a"`, `b`}},
+		Error:  `unescaped " character`, Line: 1, Column: 2,
+	},
+	{
+		Name:   "BareDoubleQuotes",
+		Quoted: true,
+		Input:  `a""b,c`,
+		Output: [][]string{{`a""b`, `c`}},
+	},
+	{
+		Name:   "TrimQuote", // differs
+		Quoted: true,
+		Input:  ` "a"," b",c`,
+		Trim:   true,
+		Output: [][]string{{`"a"`, " b", "c"}},
+	},
+	{
+		Name:   "BareQuote", // differs
+		Quoted: true,
+		Input:  `a "word","b"`,
+		Output: [][]string{{`a "word"`, "b"}},
+	},
+	{
+		Name:   "TrailingQuote", // differs
+		Quoted: true,
+		Input:  `"a word",b"`,
+		Output: [][]string{{"a word", `b"`}},
+	},
+	{
+		Name:   "ExtraneousQuote", // differs
+		Quoted: true,
+		Input:  `"a "word","b"`,
+		Error:  `unescaped " character`, Line: 1, Column: 1,
+	},
+	{
+		Name:   "FieldCount",
+		Input:  "a,b,c\nd,e",
+		Output: [][]string{{"a", "b", "c"}, {"d", "e"}},
+	},
+	{
+		Name:   "TrailingCommaEOF",
+		Input:  "a,b,c,",
+		Output: [][]string{{"a", "b", "c", ""}},
+	},
+	{
+		Name:   "TrailingCommaEOL",
+		Input:  "a,b,c,\n",
+		Output: [][]string{{"a", "b", "c", ""}},
+	},
+	{
+		Name:   "TrailingCommaSpaceEOF",
+		Trim:   true,
+		Input:  "a,b,c, ",
+		Output: [][]string{{"a", "b", "c", ""}},
+	},
+	{
+		Name:   "TrailingCommaSpaceEOL",
+		Trim:   true,
+		Input:  "a,b,c, \n",
+		Output: [][]string{{"a", "b", "c", ""}},
+	},
+	{
+		Name:   "TrailingCommaLine3",
+		Trim:   true,
+		Input:  "a,b,c\nd,e,f\ng,hi,",
+		Output: [][]string{{"a", "b", "c"}, {"d", "e", "f"}, {"g", "hi", ""}},
+	},
+	{
+		Name:   "NotTrailingComma3",
+		Input:  "a,b,c, \n",
+		Output: [][]string{{"a", "b", "c", " "}},
+	},
+	{
+		Name:   "CommaFieldTest",
+		Quoted: true,
+		Input: `x,y,z,w
+x,y,z,
+x,y,,
+x,,,
+,,,
+"x","y","z","w"
+"x","y","z",""
+"x","y","",""
+"x","","",""
+"","","",""
+`,
+		Output: [][]string{
+			{"x", "y", "z", "w"},
+			{"x", "y", "z", ""},
+			{"x", "y", "", ""},
+			{"x", "", "", ""},
+			{"", "", "", ""},
+			{"x", "y", "z", "w"},
+			{"x", "y", "z", ""},
+			{"x", "y", "", ""},
+			{"x", "", "", ""},
+			{"", "", "", ""},
+		},
+	},
+	{
+		Name:  "TrailingCommaIneffective1",
+		Input: "a,b,\nc,d,e",
+		Output: [][]string{
+			{"a", "b", ""},
+			{"c", "d", "e"},
+		},
+	},
+	{
+		Name:   "Guess",
+		Guess:  ';',
+		Input:  "a,b;c\td:e|f;g",
+		Output: [][]string{{"a,b", "c\td:e|f", "g"}},
+	},
 }
 
-func TestEscapedQuoteLine(t *testing.T) {
-	r := makeReader(`"a",b,"c""d"`, true)
-	values := readRow(r)
-	checkNoError(t, r.Err())
-	checkValueCount(t, 3, values)
-	expected := []string{"a", "b", "c\"d"}
-	checkEquals(t, expected, values)
-}
+func TestRead(t *testing.T) {
+	for _, tt := range readTests {
+		var comma byte = ','
+		if tt.Comma != 0 {
+			comma = tt.Comma
+		}
+		r := NewReader(strings.NewReader(tt.Input), comma, tt.Quoted, tt.Guess != 0)
+		r.Comment = tt.Comment
+		r.Trim = tt.Trim
 
-func TestEmbeddedNewline(t *testing.T) {
-	r := makeReader("a,\"b\nb\",\"c\n\n\",d", true)
-	values := readRow(r)
-	checkNoError(t, r.Err())
-	checkValueCount(t, 4, values)
-	expected := []string{"a", "b\nb", "c\n\n", "d"}
-	checkEquals(t, expected, values)
-}
-
-func TestEscapedQuoteAndEmbeddedNewLine(t *testing.T) {
-	r := makeReader("\"a\"\"b\",\"c\"\"\r\nd\"", true)
-	values := readRow(r)
-	checkNoError(t, r.Err())
-	checkValueCount(t, 2, values)
-	expected := []string{"a\"b", "c\"\r\nd"}
-	checkEquals(t, expected, values)
-}
-
-func TestGuess(t *testing.T) {
-	r := NewReader(strings.NewReader("a,b;c\td:e|f;g"), ',', true, true)
-	values := readRow(r)
-	checkNoError(t, r.Err())
-	if ';' != r.Sep() {
-		t.Errorf("got '%q'; want '%q'", r.Sep(), ';')
+		i, j := 0, 0
+		for r.Scan() {
+			if r.EmptyLine() { // skip empty line (or line comment)
+				continue
+			}
+			if i >= len(tt.Output) {
+				t.Errorf("%s: unexpected number of row %d; want %d max", tt.Name, i+1, len(tt.Output))
+				break
+			} else if j >= len(tt.Output[i]) {
+				t.Errorf("%s: unexpected number of column %d; want %d at line %d", tt.Name, j+1, len(tt.Output[i]), i+1)
+				break
+			}
+			if r.Text() != tt.Output[i][j] {
+				t.Errorf("%s: unexpected value %s; want %s at line %d, column %d", tt.Name, r.Text(), tt.Output[i][j], i+1, j+1)
+			}
+			if r.EndOfRecord() {
+				j = 0
+				i++
+			} else {
+				j++
+			}
+		}
+		err := r.Err()
+		if tt.Error != "" {
+			if err == nil || !strings.Contains(err.Error(), tt.Error) {
+				t.Errorf("%s: error %v, want error %q", tt.Name, err, tt.Error)
+			} else if tt.Line != 0 && (tt.Line != r.LineNumber() || tt.Column != j+1) {
+				t.Errorf("%s: error at %d:%d expected %d:%d", tt.Name, r.LineNumber(), j+1, tt.Line, tt.Column)
+			}
+		} else if err != nil {
+			t.Errorf("%s: unexpected error %v", tt.Name, err)
+		}
+		if tt.Guess != 0 && tt.Guess != r.Sep() {
+			t.Errorf("got '%q'; want '%q'", r.Sep(), tt.Guess)
+		}
 	}
-	checkValueCount(t, 3, values)
-	expected := []string{"a,b", "c\td:e|f", "g"}
-	checkEquals(t, expected, values)
-}
-
-func TestTrim(t *testing.T) {
-	r := makeReader(` a,b ," c ", d `, true)
-	r.Trim = true
-	values := readRow(r)
-	checkNoError(t, r.Err())
-	checkValueCount(t, 4, values)
-	expected := []string{"a", "b", " c ", "d"}
-	checkEquals(t, expected, values)
-}
-
-func TestLineComment(t *testing.T) {
-	r := makeReader("a,#\n# comment\nb\n# comment", true)
-	r.Comment = '#'
-	values := readRow(r)
-	checkNoError(t, r.Err())
-	checkEquals(t, []string{"a", "#"}, values)
-	values = readRow(r)
-	checkNoError(t, r.Err())
-	checkEquals(t, []string{"b"}, values)
-	if r.Scan() {
-		t.Error("expected no value")
-	}
-	checkNoError(t, r.Err())
-}
-
-func TestEmptyLine(t *testing.T) {
-	r := makeReader("a,b,\"c\"\n\nd,e,f", true)
-	values := readRow(r)
-	checkNoError(t, r.Err())
-	checkValueCount(t, 3, values)
-	values = readRow(r)
-	checkNoError(t, r.Err())
-	checkValueCount(t, 3, values)
-}
-
-func TestWindowsEndOfLine(t *testing.T) {
-	r := makeReader("a,b,c\r\nd,e,\"f\"\r\n", true)
-	values := readRow(r)
-	checkNoError(t, r.Err())
-	checkValueCount(t, 3, values)
-	values = readRow(r)
-	checkNoError(t, r.Err())
-	checkValueCount(t, 3, values)
 }
