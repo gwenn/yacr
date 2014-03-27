@@ -5,56 +5,34 @@
 package yacr_test
 
 import (
-	"reflect"
 	"strings"
 	"testing"
 	. "github.com/gwenn/yacr"
 )
 
-func makeReader(s string, quoted bool) *Reader {
-	return NewReader(strings.NewReader(s), ',', quoted, false)
-}
-
-func readRow(r *Reader) []string {
-	row := make([]string, 0, 10)
+func TestLongLine(t *testing.T) {
+	content := strings.Repeat("1,2,3,4,5,6,7,8,9,10,", 200)
+	r := NewReader(strings.NewReader(content), ',', true, false)
+	values := make([]string, 0, 10)
 	for r.Scan() {
 		if r.EmptyLine() { // skip empty line (or line comment)
 			continue
 		}
-		row = append(row, r.Text())
+		values = append(values, r.Text())
 		if r.EndOfRecord() {
 			break
 		}
 	}
-	return row
-}
-
-func checkValueCount(t *testing.T, expected int, values []string) {
-	if len(values) != expected {
-		t.Errorf("got %d value(s) (%#v); want %d", len(values), values, expected)
+	err := r.Err()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(values) != 2001 {
+		t.Errorf("got %d value(s) (%#v); want %d", len(values), values, 2001)
 	}
 }
 
-func checkNoError(t *testing.T, e error) {
-	if e != nil {
-		t.Fatal(e)
-	}
-}
-
-func checkEquals(t *testing.T, expected, actual []string) {
-	if !reflect.DeepEqual(expected, actual) {
-		t.Errorf("got %#v; want %#v", actual, expected)
-	}
-}
-
-func TestLongLine(t *testing.T) {
-	content := strings.Repeat("1,2,3,4,5,6,7,8,9,10,", 200)
-	r := makeReader(content, true)
-	values := readRow(r)
-	checkNoError(t, r.Err())
-	checkValueCount(t, 2001, values)
-}
-
+// Stolen/adapted from $GOROOT/src/pkg/encoding/csv/reader_test.go
 var readTests = []struct {
 	Name   string
 	Input  string

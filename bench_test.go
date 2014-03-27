@@ -28,7 +28,7 @@ func benchmarkParsing(b *testing.B, s string, quoted bool) {
 	b.SetBytes(int64(len(str)))
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		r := makeReader(str, quoted)
+		r := NewReader(strings.NewReader(str), ',', quoted, false)
 		nb := 0
 		for r.Scan() {
 			if r.EndOfRecord() {

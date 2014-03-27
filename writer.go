@@ -46,7 +46,7 @@ func (w *Writer) Write(field []byte) bool {
 		last := 0
 		for i, c := range field {
 			switch c {
-			case '"', '\n', w.sep:
+			case '"', '\r', '\n', w.sep:
 			default:
 				continue
 			}
