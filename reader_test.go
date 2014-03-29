@@ -39,7 +39,7 @@ var readTests = []struct {
 	Output [][]string
 
 	// These fields are copied into the Reader
-	Comma   byte
+	Sep     byte
 	Quoted  bool
 	Guess   byte
 	Trim    bool
@@ -93,7 +93,7 @@ zzz,yyy,xxx
 	},
 	{
 		Name:   "Semicolon",
-		Comma:  ';',
+		Sep:    ';',
 		Input:  "a;b;c\n",
 		Output: [][]string{{"a", "b", "c"}},
 	},
@@ -276,15 +276,34 @@ x,,,
 		Input:  "a,b;c\td:e|f;g",
 		Output: [][]string{{"a,b", "c\td:e|f", "g"}},
 	},
+	{
+		Name:   "6287",
+		Input:  `Field1,Field2,"LazyQuotes" Field3,Field4,Field5`,
+		Output: [][]string{{"Field1", "Field2", "\"LazyQuotes\" Field3", "Field4", "Field5"}},
+	},
+	{
+		Name:   "6258",
+		Quoted: true,
+		Input:  `"Field1","Field2 "LazyQuotes"","Field3","Field4"`,
+		Output: [][]string{{"Field1", "Field2 \"LazyQuotes\"", "Field3", "Field4"}},
+		Error:  `unescaped " character`, Line: 1, Column: 2,
+	},
+	{
+		Name: "3150",
+		Sep:  '\t',
+		Input: `3376027	”S” Falls	"S" Falls		4.53333`,
+		Output: [][]string{{"3376027", `”S” Falls`, `"S" Falls`, "", "4.53333"}},
+	},
+	//
 }
 
 func TestRead(t *testing.T) {
 	for _, tt := range readTests {
-		var comma byte = ','
-		if tt.Comma != 0 {
-			comma = tt.Comma
+		var sep byte = ','
+		if tt.Sep != 0 {
+			sep = tt.Sep
 		}
-		r := NewReader(strings.NewReader(tt.Input), comma, tt.Quoted, tt.Guess != 0)
+		r := NewReader(strings.NewReader(tt.Input), sep, tt.Quoted, tt.Guess != 0)
 		r.Comment = tt.Comment
 		r.Trim = tt.Trim
 
