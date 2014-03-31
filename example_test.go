@@ -47,7 +47,7 @@ func Example_reader() {
 func Example_writer() {
 	w := yacr.DefaultWriter(os.Stdout)
 	for _, field := range []string{"c1", "c\"2", "c\n3", "c,4"} {
-		if !w.Write([]byte(field)) { // TODO how to avoid copy?
+		if !w.WriteString(field) {
 			break
 		}
 	}

@@ -7,6 +7,8 @@ package yacr
 import (
 	"bufio"
 	"io"
+	"reflect"
+	"unsafe"
 )
 
 // Writer provides an interface for writing CSV data
@@ -31,6 +33,17 @@ func DefaultWriter(wr io.Writer) *Writer {
 // NewWriter returns a new CSV writer.
 func NewWriter(w io.Writer, sep byte, quoted bool) *Writer {
 	return &Writer{b: bufio.NewWriter(w), sep: sep, quoted: quoted, sor: true}
+}
+
+func (w *Writer) WriteString(field string) bool {
+	// To avoid making a copy...
+	hs := (*reflect.StringHeader)(unsafe.Pointer(&field))
+	var b []byte
+	hb := (*reflect.SliceHeader)(unsafe.Pointer(&b))
+	hb.Data = hs.Data
+	hb.Len = hs.Len
+	hb.Cap = hs.Len
+	return w.Write(b)
 }
 
 // Write ensures that field is quoted when needed.

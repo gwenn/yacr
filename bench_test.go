@@ -5,6 +5,7 @@
 package yacr_test
 
 import (
+	"bytes"
 	"encoding/csv"
 	"io"
 	"strings"
@@ -87,6 +88,39 @@ func BenchmarkYacrParser(b *testing.B) {
 		}
 		if nb != 2000 {
 			b.Fatalf("wrong # rows: %d; want %d", nb, 2000)
+		}
+	}
+}
+
+func BenchmarkYacrWriter(b *testing.B) {
+	b.StopTimer()
+	var row []string = strings.Fields(strings.Repeat("valu,e1 value2\" value3 valu\ne4 value5", 25))
+	out := &bytes.Buffer{}
+	b.StartTimer()
+	w := DefaultWriter(out)
+	for i := 0; i < b.N; i++ {
+		for _, field := range row {
+			w.WriteString(field)
+		}
+		w.EndOfRecord()
+		w.Flush()
+		if err := w.Err(); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkStdWriter(b *testing.B) {
+	b.StopTimer()
+	var row []string = strings.Fields(strings.Repeat("valu,e1 value2\" value3 valu\ne4 value5", 25))
+	out := &bytes.Buffer{}
+	b.StartTimer()
+	w := csv.NewWriter(out)
+	for i := 0; i < b.N; i++ {
+		w.Write(row)
+		w.Flush()
+		if err := w.Error(); err != nil {
+			b.Fatal(err)
 		}
 	}
 }

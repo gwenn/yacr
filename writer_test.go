@@ -13,7 +13,7 @@ import (
 
 func writeRow(w *Writer, row []string) {
 	for _, field := range row {
-		if !w.Write([]byte(field)) {
+		if !w.WriteString(field) {
 			break
 		}
 	}
