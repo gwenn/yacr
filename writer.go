@@ -17,10 +17,12 @@ import (
 // The EndOfRecord method tells when a line break is inserted.
 type Writer struct {
 	b      *bufio.Writer
-	sep    byte  // values separator
-	quoted bool  // specify if values should be quoted (when they contain a separator or a newline)
-	sor    bool  // true at start of record
-	err    error // sticky error.
+	sep    byte                 // values separator
+	quoted bool                 // specify if values should be quoted (when they contain a separator or a newline)
+	sor    bool                 // true at start of record
+	err    error                // sticky error.
+	bs     []byte               // byte slice used to write string with minimal/no alloc/copy
+	hb     *reflect.SliceHeader // header of bs
 
 	UseCRLF bool // True to use \r\n as the line terminator
 }
@@ -32,18 +34,18 @@ func DefaultWriter(wr io.Writer) *Writer {
 
 // NewWriter returns a new CSV writer.
 func NewWriter(w io.Writer, sep byte, quoted bool) *Writer {
-	return &Writer{b: bufio.NewWriter(w), sep: sep, quoted: quoted, sor: true}
+	wr := &Writer{b: bufio.NewWriter(w), sep: sep, quoted: quoted, sor: true}
+	wr.hb = (*reflect.SliceHeader)(unsafe.Pointer(&wr.bs))
+	return wr
 }
 
 func (w *Writer) WriteString(field string) bool {
 	// To avoid making a copy...
 	hs := (*reflect.StringHeader)(unsafe.Pointer(&field))
-	var b []byte
-	hb := (*reflect.SliceHeader)(unsafe.Pointer(&b))
-	hb.Data = hs.Data
-	hb.Len = hs.Len
-	hb.Cap = hs.Len
-	return w.Write(b)
+	w.hb.Data = hs.Data
+	w.hb.Len = hs.Len
+	w.hb.Cap = hs.Len
+	return w.Write(w.bs)
 }
 
 // Write ensures that field is quoted when needed.
