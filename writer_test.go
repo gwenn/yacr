@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"errors"
 	"testing"
+	"time"
 	. "github.com/gwenn/yacr"
 )
 
@@ -87,5 +88,30 @@ func TestError(t *testing.T) {
 
 	if err == nil {
 		t.Error("Error should not be nil")
+	}
+}
+
+var writeLineTests = []struct {
+	Input  []interface{}
+	Output string
+}{
+	{Input: []interface{}{"abc"}, Output: "abc\n"},
+	{Input: []interface{}{nil, "nil", 123, 3.14, time.Unix(0, 0).UTC()}, Output: ",nil,123,3.14,1970-01-01T00:00:00Z\n"},
+}
+
+func TestWriteLine(t *testing.T) {
+	for n, tt := range writeLineTests {
+		b := &bytes.Buffer{}
+		w := DefaultWriter(b)
+		w.WriteLine(tt.Input...)
+		w.Flush()
+		err := w.Err()
+		if err != nil {
+			t.Errorf("Unexpected error: %s\n", err)
+		}
+		out := b.String()
+		if out != tt.Output {
+			t.Errorf("#%d: out=%q want %q", n, out, tt.Output)
+		}
 	}
 }

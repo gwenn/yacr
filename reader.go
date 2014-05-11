@@ -8,8 +8,11 @@ package yacr
 import (
 	"bufio"
 	"bytes"
+	"encoding"
 	"fmt"
 	"io"
+	"reflect"
+	"strconv"
 )
 
 // Reader provides an interface for reading CSV data
@@ -39,6 +42,102 @@ func NewReader(r io.Reader, sep byte, quoted, guess bool) *Reader {
 	s := &Reader{bufio.NewScanner(r), sep, quoted, guess, true, 1, false, false, 0}
 	s.Split(s.ScanField)
 	return s
+}
+
+// ScanLine decodes one line fields to values.
+func (s *Reader) ScanLine(values ...interface{}) error {
+	for i, value := range values {
+		if !s.Scan() {
+			return s.Err()
+		}
+		if i == 0 { // skip empty line (or line comment)
+			for s.EmptyLine() {
+				if !s.Scan() {
+					return s.Err()
+				}
+			}
+		}
+		if err := s.scanValue(value); err != nil {
+			return err
+		} else if s.EndOfRecord() != (i == len(values)-1) {
+			return fmt.Errorf("unexpected number of fields: want %d, got %d", len(values), i+1)
+		}
+	}
+	return nil
+}
+
+// ScanValue decodes one field's content to value.
+func (s *Reader) ScanValue(value interface{}) error {
+	if !s.Scan() {
+		return s.Err()
+	}
+	return s.scanValue(value)
+}
+func (s *Reader) scanValue(value interface{}) error {
+	var err error
+	switch value := value.(type) {
+	case nil:
+	case *string:
+		*value = s.Text()
+	case *int:
+		*value, err = strconv.Atoi(s.Text())
+	case *int32:
+		var i int64
+		i, err = strconv.ParseInt(s.Text(), 10, 32)
+		*value = int32(i)
+	case *int64:
+		*value, err = strconv.ParseInt(s.Text(), 10, 64)
+	case *bool:
+		*value, err = strconv.ParseBool(s.Text())
+	case *float64:
+		*value, err = strconv.ParseFloat(s.Text(), 64)
+	case *[]byte:
+		*value = s.Bytes() // The underlying array may point to data that will be overwritten by a subsequent call to Scan.
+	case encoding.TextUnmarshaler:
+		err = value.UnmarshalText(s.Bytes())
+	default:
+		return s.scanReflect(value)
+	}
+	return err
+}
+
+func (s *Reader) scanReflect(v interface{}) (err error) {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Ptr || rv.IsNil() {
+		return fmt.Errorf("unsupported type %T", v)
+	}
+	dv := reflect.Indirect(rv)
+	switch dv.Kind() {
+	case reflect.String:
+		dv.SetString(s.Text())
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		var i int64
+		i, err = strconv.ParseInt(s.Text(), 10, dv.Type().Bits())
+		if err == nil {
+			dv.SetInt(i)
+		}
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		var i uint64
+		i, err = strconv.ParseUint(s.Text(), 10, dv.Type().Bits())
+		if err == nil {
+			dv.SetUint(i)
+		}
+	case reflect.Bool:
+		var b bool
+		b, err = strconv.ParseBool(s.Text())
+		if err == nil {
+			dv.SetBool(b)
+		}
+	case reflect.Float32, reflect.Float64:
+		var f float64
+		f, err = strconv.ParseFloat(s.Text(), dv.Type().Bits())
+		if err == nil {
+			dv.SetFloat(f)
+		}
+	default:
+		return fmt.Errorf("unsupported type: %T", v)
+	}
+	return
 }
 
 // LineNumber returns current line number (not record number)

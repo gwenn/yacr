@@ -6,8 +6,11 @@ package yacr
 
 import (
 	"bufio"
+	"encoding"
+	"fmt"
 	"io"
 	"reflect"
+	"strconv"
 	"unsafe"
 )
 
@@ -39,27 +42,98 @@ func NewWriter(w io.Writer, sep byte, quoted bool) *Writer {
 	return wr
 }
 
-func (w *Writer) WriteString(field string) bool {
+// WriteLine ensures that values are quoted when needed.
+func (w *Writer) WriteLine(values ...interface{}) bool {
+	for _, v := range values {
+		if !w.WriteValue(v) {
+			return false
+		}
+	}
+	w.EndOfRecord()
+	return w.err == nil
+}
+
+// WriteValue ensures that value is quoted when needed.
+// Value's type/kind is used to encode value to text.
+func (w *Writer) WriteValue(value interface{}) bool {
+	switch value := value.(type) {
+	case nil:
+		return w.Write([]byte{})
+	case string:
+		return w.WriteString(value)
+	case int:
+		return w.WriteString(strconv.Itoa(value))
+	case int32:
+		return w.WriteString(strconv.FormatInt(int64(value), 10))
+	case int64:
+		return w.WriteString(strconv.FormatInt(value, 10))
+	case bool:
+		return w.WriteString(strconv.FormatBool(value))
+	case float32:
+		return w.WriteString(strconv.FormatFloat(float64(value), 'f', -1, 32))
+	case float64:
+		return w.WriteString(strconv.FormatFloat(value, 'f', -1, 64))
+	case []byte:
+		return w.Write(value)
+	case encoding.TextMarshaler: // time.Time
+		if text, err := value.MarshalText(); err != nil {
+			w.setErr(err)
+			w.Write([]byte{}) // TODO Validate: write an empty field
+			return false
+		} else {
+			return w.Write(text)
+		}
+	default:
+		return w.writeReflect(value)
+	}
+	panic("unreachable")
+}
+
+// WriteReflect ensures that value is quoted when needed.
+// Value's (reflect) Kind is used to encode value to text.
+func (w *Writer) writeReflect(value interface{}) bool {
+	v := reflect.ValueOf(value)
+	switch v.Kind() {
+	case reflect.String:
+		return w.WriteString(v.String())
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return w.WriteString(strconv.FormatInt(v.Int(), 10))
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return w.WriteString(strconv.FormatUint(v.Uint(), 10))
+	case reflect.Bool:
+		return w.WriteString(strconv.FormatBool(v.Bool()))
+	case reflect.Float32, reflect.Float64:
+		return w.WriteString(strconv.FormatFloat(v.Float(), 'f', -1, v.Type().Bits()))
+	default:
+		w.setErr(fmt.Errorf("unsupported type: %T, %v", value, value))
+		w.Write([]byte{}) // TODO Validate: write an empty field
+		return false
+	}
+	panic("unreachable")
+}
+
+// WriteString ensures that value is quoted when needed.
+func (w *Writer) WriteString(value string) bool {
 	// To avoid making a copy...
-	hs := (*reflect.StringHeader)(unsafe.Pointer(&field))
+	hs := (*reflect.StringHeader)(unsafe.Pointer(&value))
 	w.hb.Data = hs.Data
 	w.hb.Len = hs.Len
 	w.hb.Cap = hs.Len
 	return w.Write(w.bs)
 }
 
-// Write ensures that field is quoted when needed.
-func (w *Writer) Write(field []byte) bool {
+// Write ensures that value is quoted when needed.
+func (w *Writer) Write(value []byte) bool {
 	if w.err != nil {
 		return false
 	}
 	if !w.sor {
 		w.setErr(w.b.WriteByte(w.sep))
 	}
-	// In quoted mode, field is enclosed between quotes if it contains sep, quote or \n.
+	// In quoted mode, value is enclosed between quotes if it contains sep, quote or \n.
 	if w.quoted {
 		last := 0
-		for i, c := range field {
+		for i, c := range value {
 			switch c {
 			case '"', '\r', '\n', w.sep:
 			default:
@@ -68,7 +142,7 @@ func (w *Writer) Write(field []byte) bool {
 			if last == 0 {
 				w.setErr(w.b.WriteByte('"'))
 			}
-			if _, err := w.b.Write(field[last:i]); err != nil {
+			if _, err := w.b.Write(value[last:i]); err != nil {
 				w.setErr(err)
 			}
 			w.setErr(w.b.WriteByte(c))
@@ -77,14 +151,14 @@ func (w *Writer) Write(field []byte) bool {
 			}
 			last = i + 1
 		}
-		if _, err := w.b.Write(field[last:]); err != nil {
+		if _, err := w.b.Write(value[last:]); err != nil {
 			w.setErr(err)
 		}
 		if last != 0 {
 			w.setErr(w.b.WriteByte('"'))
 		}
 	} else {
-		if _, err := w.b.Write(field); err != nil {
+		if _, err := w.b.Write(value); err != nil {
 			w.setErr(err)
 		}
 	}

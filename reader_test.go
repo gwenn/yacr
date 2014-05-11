@@ -7,6 +7,7 @@ package yacr_test
 import (
 	"strings"
 	"testing"
+	"time"
 	. "github.com/gwenn/yacr"
 )
 
@@ -342,5 +343,29 @@ func TestRead(t *testing.T) {
 		if tt.Guess != 0 && tt.Guess != r.Sep() {
 			t.Errorf("got '%q'; want '%q'", r.Sep(), tt.Guess)
 		}
+	}
+}
+
+func TestScanLine(t *testing.T) {
+	r := DefaultReader(strings.NewReader(",nil,123,3.14,1970-01-01T00:00:00Z\n"))
+	var str string
+	var i int
+	var f float64
+	var d time.Time
+	err := r.ScanLine(nil, &str, &i, &f, &d)
+	if str != "nil" {
+		t.Errorf("want %s, got %s", "nil", str)
+	}
+	if i != 123 {
+		t.Errorf("want %d, got %d", 123, i)
+	}
+	if f != 3.14 {
+		t.Errorf("want %f, got %f", 3.14, f)
+	}
+	if d != time.Unix(0, 0).UTC() {
+		t.Errorf("want %v, got %v", time.Unix(0, 0).UTC(), d)
+	}
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
 	}
 }
