@@ -45,6 +45,7 @@ func NewReader(r io.Reader, sep byte, quoted, guess bool) *Reader {
 }
 
 // ScanLine decodes one line fields to values.
+// It's like fmt.Scan or database.sql.Rows.Scan.
 func (s *Reader) ScanLine(values ...interface{}) error {
 	for i, value := range values {
 		if !s.Scan() {

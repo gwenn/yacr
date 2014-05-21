@@ -43,6 +43,7 @@ func NewWriter(w io.Writer, sep byte, quoted bool) *Writer {
 }
 
 // WriteLine ensures that values are quoted when needed.
+// It's like fmt.Println.
 func (w *Writer) WriteLine(values ...interface{}) bool {
 	for _, v := range values {
 		if !w.WriteValue(v) {
