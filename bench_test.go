@@ -94,7 +94,7 @@ func BenchmarkYacrParser(b *testing.B) {
 
 func BenchmarkYacrWriter(b *testing.B) {
 	b.StopTimer()
-	var row []string = strings.Fields(strings.Repeat("valu,e1 value2\" value3 valu\ne4 value5", 25))
+	row := strings.Fields(strings.Repeat("valu,e1 value2\" value3 valu\ne4 value5", 25))
 	out := &bytes.Buffer{}
 	b.StartTimer()
 	w := DefaultWriter(out)
@@ -112,7 +112,7 @@ func BenchmarkYacrWriter(b *testing.B) {
 
 func BenchmarkStdWriter(b *testing.B) {
 	b.StopTimer()
-	var row []string = strings.Fields(strings.Repeat("valu,e1 value2\" value3 valu\ne4 value5", 25))
+	row := strings.Fields(strings.Repeat("valu,e1 value2\" value3 valu\ne4 value5", 25))
 	out := &bytes.Buffer{}
 	b.StartTimer()
 	w := csv.NewWriter(out)

@@ -82,7 +82,7 @@ func (w *Writer) WriteValue(value interface{}) bool {
 			w.Write([]byte{}) // TODO Validate: write an empty field
 			return false
 		} else {
-			return w.Write(text)
+			return w.Write(text) // please, ignore golint
 		}
 	default:
 		return w.writeReflect(value)
