@@ -18,3 +18,9 @@ BenchmarkYacrParser	    5000	    669959 ns/op	 179.12 MB/s	    4288 B/op	       
 BenchmarkYacrWriter	  200000	      9422 ns/op	    2755 B/op	       0 allocs/op
 BenchmarkStdWriter	   50000	     31212 ns/op	    2755 B/op	       0 allocs/op
 </pre>
+
+USAGES
+------
+* [csvdiff](https://github.com/gwenn/csvdiff)
+* [csvgrep](https://github.com/gwenn/csvgrep)
+* [SQLite import/export/module](https://github.com/gwenn/gosqlite/blob/master/csv.go)
