@@ -22,7 +22,7 @@ import (
 type Reader struct {
 	*bufio.Scanner
 	sep    byte // values separator
-	quoted bool // specify if values may be quoted (when they contains separator or newline)
+	quoted bool // specify if values may be quoted (when they contain separator or newline)
 	guess  bool // try to guess separator based on the file header
 	eor    bool // true when the most recent field has been terminated by a newline (not a separator).
 	lineno int  // current line number (not record number)
@@ -38,6 +38,7 @@ func DefaultReader(rd io.Reader) *Reader {
 }
 
 // NewReader returns a new CSV scanner to read from r.
+// When quoted is false, values must not contain a separator or newline.
 func NewReader(r io.Reader, sep byte, quoted, guess bool) *Reader {
 	s := &Reader{bufio.NewScanner(r), sep, quoted, guess, true, 1, false, false, 0}
 	s.Split(s.ScanField)
@@ -58,7 +59,7 @@ func (s *Reader) ScanLine(values ...interface{}) error {
 				}
 			}
 		}
-		if err := s.scanValue(value); err != nil {
+		if err := s.scanValue(value, true); err != nil {
 			return err
 		} else if s.EndOfRecord() != (i == len(values)-1) {
 			return fmt.Errorf("unexpected number of fields: want %d, got %d", len(values), i+1)
@@ -68,13 +69,14 @@ func (s *Reader) ScanLine(values ...interface{}) error {
 }
 
 // ScanValue decodes one field's content to value.
+// The value may point to data that will be overwritten by a subsequent call to Scan.
 func (s *Reader) ScanValue(value interface{}) error {
 	if !s.Scan() {
 		return s.Err()
 	}
-	return s.scanValue(value)
+	return s.scanValue(value, false)
 }
-func (s *Reader) scanValue(value interface{}) error {
+func (s *Reader) scanValue(value interface{}, copied bool) error {
 	var err error
 	switch value := value.(type) {
 	case nil:
@@ -93,7 +95,14 @@ func (s *Reader) scanValue(value interface{}) error {
 	case *float64:
 		*value, err = strconv.ParseFloat(s.Text(), 64)
 	case *[]byte:
-		*value = s.Bytes() // The underlying array may point to data that will be overwritten by a subsequent call to Scan.
+		if copied {
+			v := s.Bytes()
+			c := make([]byte, len(v))
+			copy(c, v)
+			*value = c
+		} else {
+			*value = s.Bytes()
+		}
 	case encoding.TextUnmarshaler:
 		err = value.UnmarshalText(s.Bytes())
 	default:

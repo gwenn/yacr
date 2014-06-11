@@ -143,10 +143,9 @@ func (w *Writer) Write(value []byte) bool {
 			if last == 0 {
 				w.setErr(w.b.WriteByte('"'))
 			}
-			if _, err := w.b.Write(value[last:i]); err != nil {
+			if _, err := w.b.Write(value[last : i+1]); err != nil {
 				w.setErr(err)
 			}
-			w.setErr(w.b.WriteByte(c))
 			if c == '"' {
 				w.setErr(w.b.WriteByte(c)) // escaped with another double quote
 			}
