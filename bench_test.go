@@ -10,6 +10,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+
 	. "github.com/gwenn/yacr"
 )
 
@@ -94,7 +95,9 @@ func BenchmarkYacrParser(b *testing.B) {
 
 func BenchmarkYacrWriter(b *testing.B) {
 	b.StopTimer()
-	row := strings.Fields(strings.Repeat("valu,e1 value2\" value3 valu\ne4 value5", 25))
+	s := strings.Repeat("valu,e1 value2\" value3 valu\ne4 value5", 25)
+	row := strings.Fields(s)
+	b.SetBytes(int64(len(s)))
 	out := &bytes.Buffer{}
 	b.StartTimer()
 	w := DefaultWriter(out)
@@ -112,7 +115,9 @@ func BenchmarkYacrWriter(b *testing.B) {
 
 func BenchmarkStdWriter(b *testing.B) {
 	b.StopTimer()
-	row := strings.Fields(strings.Repeat("valu,e1 value2\" value3 valu\ne4 value5", 25))
+	s := strings.Repeat("valu,e1 value2\" value3 valu\ne4 value5", 25)
+	row := strings.Fields(s)
+	b.SetBytes(int64(len(s)))
 	out := &bytes.Buffer{}
 	b.StartTimer()
 	w := csv.NewWriter(out)
