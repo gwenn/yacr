@@ -9,6 +9,7 @@ import (
 	"errors"
 	"testing"
 	"time"
+
 	. "github.com/gwenn/yacr"
 )
 
@@ -91,7 +92,7 @@ func TestError(t *testing.T) {
 	}
 }
 
-var writeLineTests = []struct {
+var writeRecordTests = []struct {
 	Input  []interface{}
 	Output string
 }{
@@ -99,11 +100,11 @@ var writeLineTests = []struct {
 	{Input: []interface{}{nil, "nil", 123, 3.14, time.Unix(0, 0).UTC()}, Output: ",nil,123,3.14,1970-01-01T00:00:00Z\n"},
 }
 
-func TestWriteLine(t *testing.T) {
-	for n, tt := range writeLineTests {
+func TestWriteRecord(t *testing.T) {
+	for n, tt := range writeRecordTests {
 		b := &bytes.Buffer{}
 		w := DefaultWriter(b)
-		w.WriteLine(tt.Input...)
+		w.WriteRecord(tt.Input...)
 		w.Flush()
 		err := w.Err()
 		if err != nil {

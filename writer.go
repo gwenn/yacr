@@ -7,6 +7,7 @@ package yacr
 import (
 	"bufio"
 	"encoding"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -44,7 +45,7 @@ func NewWriter(w io.Writer, sep byte, quoted bool) *Writer {
 
 // WriteLine ensures that values are quoted when needed.
 // It's like fmt.Println.
-func (w *Writer) WriteLine(values ...interface{}) bool {
+func (w *Writer) WriteRecord(values ...interface{}) bool {
 	for _, v := range values {
 		if !w.WriteValue(v) {
 			return false
@@ -123,6 +124,11 @@ func (w *Writer) WriteString(value string) bool {
 	return w.Write(w.bs)
 }
 
+var (
+	ErrNewLine   = errors.New("yacr.Writer: newline character in value")
+	ErrSeparator = errors.New("yacr.Writer: separator in value")
+)
+
 // Write ensures that value is quoted when needed.
 func (w *Writer) Write(value []byte) bool {
 	if w.err != nil {
@@ -158,6 +164,19 @@ func (w *Writer) Write(value []byte) bool {
 			w.setErr(w.b.WriteByte('"'))
 		}
 	} else {
+		// check that value does not contain sep or \n
+		for _, c := range value {
+			switch c {
+			case '\n':
+				w.setErr(ErrNewLine)
+				return false
+			case w.sep:
+				w.setErr(ErrSeparator)
+				return false
+			default:
+				continue
+			}
+		}
 		if _, err := w.b.Write(value); err != nil {
 			w.setErr(err)
 		}
