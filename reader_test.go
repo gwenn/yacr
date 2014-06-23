@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+
 	. "github.com/gwenn/yacr"
 )
 
@@ -346,13 +347,13 @@ func TestRead(t *testing.T) {
 	}
 }
 
-func TestScanLine(t *testing.T) {
+func TestScanRecord(t *testing.T) {
 	r := DefaultReader(strings.NewReader(",nil,123,3.14,1970-01-01T00:00:00Z\n"))
 	var str string
 	var i int
 	var f float64
 	var d time.Time
-	err := r.ScanLine(nil, &str, &i, &f, &d)
+	err := r.ScanRecord(nil, &str, &i, &f, &d)
 	if str != "nil" {
 		t.Errorf("want %s, got %s", "nil", str)
 	}

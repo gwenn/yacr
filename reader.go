@@ -45,9 +45,9 @@ func NewReader(r io.Reader, sep byte, quoted, guess bool) *Reader {
 	return s
 }
 
-// ScanLine decodes one line fields to values.
+// ScanRecord decodes one line fields to values.
 // It's like fmt.Scan or database.sql.Rows.Scan.
-func (s *Reader) ScanLine(values ...interface{}) error {
+func (s *Reader) ScanRecord(values ...interface{}) error {
 	for i, value := range values {
 		if !s.Scan() {
 			return s.Err()
@@ -250,14 +250,14 @@ func (s *Reader) ScanField(data []byte, atEOF bool) (advance int, token []byte, 
 			} else if c == '\n' {
 				s.lineno++
 				if i > 0 && data[i-1] == '\r' {
-					s.empty = s.eor && i == 1
+					s.empty = s.eor && i == 1 // FIXME empty & trim
 					s.eor = true
 					if s.Trim {
 						return i + shift + 1, trim(data[0 : i-1]), nil
 					}
 					return i + shift + 1, data[0 : i-1], nil
 				}
-				s.empty = s.eor && i == 0
+				s.empty = s.eor && i == 0 // FIXME empty & trim
 				s.eor = true
 				if s.Trim {
 					return i + shift + 1, trim(data[0:i]), nil
