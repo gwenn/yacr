@@ -43,7 +43,7 @@ func NewWriter(w io.Writer, sep byte, quoted bool) *Writer {
 	return wr
 }
 
-// WriteLine ensures that values are quoted when needed.
+// WriteRecord ensures that values are quoted when needed.
 // It's like fmt.Println.
 func (w *Writer) WriteRecord(values ...interface{}) bool {
 	for _, v := range values {
@@ -88,7 +88,6 @@ func (w *Writer) WriteValue(value interface{}) bool {
 	default:
 		return w.writeReflect(value)
 	}
-	panic("unreachable")
 }
 
 // WriteReflect ensures that value is quoted when needed.
@@ -111,7 +110,6 @@ func (w *Writer) writeReflect(value interface{}) bool {
 		w.Write([]byte{}) // TODO Validate: write an empty field
 		return false
 	}
-	panic("unreachable")
 }
 
 // WriteString ensures that value is quoted when needed.
@@ -125,7 +123,9 @@ func (w *Writer) WriteString(value string) bool {
 }
 
 var (
-	ErrNewLine   = errors.New("yacr.Writer: newline character in value")
+	// ErrNewLine is the error returned when a value contains a newline in not quoted mode.
+	ErrNewLine = errors.New("yacr.Writer: newline character in value")
+	// ErrSeparator is the error returned when a value contains a separator in not quoted mode.
 	ErrSeparator = errors.New("yacr.Writer: separator in value")
 )
 
