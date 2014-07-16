@@ -28,7 +28,7 @@ type Reader struct {
 	lineno int  // current line number (not record number)
 	empty  bool // true when the current line is empty (or a line comment)
 
-	Trim    bool // trim spaces (only on not-quoted values). Break rfc4180 rule: "Spaces are considered part of a field and should not be ignored."
+	Trim    bool // trim spaces (only on unquoted values). Break rfc4180 rule: "Spaces are considered part of a field and should not be ignored."
 	Comment byte // character marking the start of a line comment. When specified, line comment appears as empty line.
 }
 
@@ -238,7 +238,7 @@ func (s *Reader) ScanField(data []byte, atEOF bool) (advance int, token []byte, 
 		if atEOF {
 			return len(data) + shift, nil, nil
 		}
-	} else { // non-quoted field
+	} else { // unquoted field
 		// Scan until separator or newline, marking end of field.
 		for i, c := range data {
 			if c == s.sep {

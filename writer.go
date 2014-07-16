@@ -123,9 +123,9 @@ func (w *Writer) WriteString(value string) bool {
 }
 
 var (
-	// ErrNewLine is the error returned when a value contains a newline in not quoted mode.
+	// ErrNewLine is the error returned when a value contains a newline in unquoted mode.
 	ErrNewLine = errors.New("yacr.Writer: newline character in value")
-	// ErrSeparator is the error returned when a value contains a separator in not quoted mode.
+	// ErrSeparator is the error returned when a value contains a separator in unquoted mode.
 	ErrSeparator = errors.New("yacr.Writer: separator in value")
 )
 
