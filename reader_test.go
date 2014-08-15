@@ -43,6 +43,7 @@ var readTests = []struct {
 	// These fields are copied into the Reader
 	Sep     byte
 	Quoted  bool
+	Lazy    bool
 	Guess   byte
 	Trim    bool
 	Comment byte
@@ -162,11 +163,25 @@ b","c
 		Output: [][]string{{"#1", "2", "3"}, {"a", "b", "c"}},
 	},
 	{
-		Name:   "LazyQuotes", // differs
+		Name:   "StrictQuotes",
 		Quoted: true,
 		Input:  `a "word","1"2",a","b`,
 		Output: [][]string{{`a "word"`, `1"2`, `a"`, `b`}},
 		Error:  `unescaped " character`, Line: 1, Column: 2,
+	},
+	{
+		Name:   "LazyQuotes", // differs
+		Quoted: true,
+		Lazy:   true,
+		Input:  `a "word","1"2",a","b"`,
+		Output: [][]string{{`a "word"`, `1"2`, `a"`, `b`}},
+	},
+	{
+		Name:   "BareQuotes",
+		Quoted: true,
+		Lazy:   true,
+		Input:  `a "word","1"2",a"`,
+		Output: [][]string{{`a "word"`, `1"2`, `a"`}},
 	},
 	{
 		Name:   "BareDoubleQuotes",
@@ -308,6 +323,7 @@ func TestRead(t *testing.T) {
 		r := NewReader(strings.NewReader(tt.Input), sep, tt.Quoted, tt.Guess != 0)
 		r.Comment = tt.Comment
 		r.Trim = tt.Trim
+		r.Lazy = tt.Lazy
 
 		i, j := 0, 0
 		for r.Scan() {

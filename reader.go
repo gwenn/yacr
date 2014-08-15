@@ -30,6 +30,7 @@ type Reader struct {
 
 	Trim    bool // trim spaces (only on unquoted values). Break rfc4180 rule: "Spaces are considered part of a field and should not be ignored."
 	Comment byte // character marking the start of a line comment. When specified, line comment appears as empty line.
+	Lazy    bool // specify if quoted values may contains unescaped quote not followed by a separator or a newline
 }
 
 // DefaultReader creates a "standard" CSV reader (separator is comma and quoted mode active)
@@ -40,7 +41,7 @@ func DefaultReader(rd io.Reader) *Reader {
 // NewReader returns a new CSV scanner to read from r.
 // When quoted is false, values must not contain a separator or newline.
 func NewReader(r io.Reader, sep byte, quoted, guess bool) *Reader {
-	s := &Reader{bufio.NewScanner(r), sep, quoted, guess, true, 1, false, false, 0}
+	s := &Reader{bufio.NewScanner(r), sep, quoted, guess, true, 1, false, false, 0, false}
 	s.Split(s.ScanField)
 	return s
 }
@@ -191,6 +192,7 @@ func (s *Reader) ScanField(data []byte, atEOF bool) (advance int, token []byte, 
 		s.empty = false
 		startLineno := s.lineno
 		escapedQuotes := 0
+		strict := true
 		var c, pc, ppc byte
 		// Scan until the separator or newline following the closing quote (and ignore escaped quote)
 		for i := 1; i < len(data); i++ {
@@ -206,16 +208,20 @@ func (s *Reader) ScanField(data []byte, atEOF bool) (advance int, token []byte, 
 			}
 			if pc == '"' && c == s.sep {
 				s.eor = false
-				return i + shift, unescapeQuotes(data[1:i-1], escapedQuotes), nil
+				return i + shift, unescapeQuotes(data[1:i-1], escapedQuotes, strict), nil
 			} else if pc == '"' && c == '\n' {
 				s.eor = true
-				return i + shift + 1, unescapeQuotes(data[1:i-1], escapedQuotes), nil
+				return i + shift + 1, unescapeQuotes(data[1:i-1], escapedQuotes, strict), nil
 			} else if c == '\n' && pc == '\r' && ppc == '"' {
 				s.eor = true
-				return i + shift + 1, unescapeQuotes(data[1:i-2], escapedQuotes), nil
+				return i + shift + 1, unescapeQuotes(data[1:i-2], escapedQuotes, strict), nil
 			}
 			if pc == '"' && c != '\r' {
-				return 0, nil, fmt.Errorf("unescaped %c character at line %d", pc, s.lineno)
+				if s.Lazy {
+					strict = false
+				} else {
+					return 0, nil, fmt.Errorf("unescaped %c character at line %d", pc, s.lineno)
+				}
 			}
 			ppc = pc
 			pc = c
@@ -223,7 +229,7 @@ func (s *Reader) ScanField(data []byte, atEOF bool) (advance int, token []byte, 
 		if atEOF {
 			if c == '"' {
 				s.eor = true
-				return len(data) + shift, unescapeQuotes(data[1:len(data)-1], escapedQuotes), nil
+				return len(data) + shift, unescapeQuotes(data[1:len(data)-1], escapedQuotes, strict), nil
 			}
 			// If we're at EOF, we have a non-terminated field.
 			return 0, nil, fmt.Errorf("non-terminated quoted field at line %d", startLineno)
@@ -280,13 +286,13 @@ func (s *Reader) ScanField(data []byte, atEOF bool) (advance int, token []byte, 
 	return 0, nil, nil
 }
 
-func unescapeQuotes(b []byte, count int) []byte {
+func unescapeQuotes(b []byte, count int, strict bool) []byte {
 	if count == 0 {
 		return b
 	}
 	for i, j := 0, 0; i < len(b); i, j = i+1, j+1 {
 		b[j] = b[i]
-		if b[i] == '"' {
+		if b[i] == '"' && (strict || i < len(b)-1 && b[i+1] == '"') {
 			i++
 		}
 	}
