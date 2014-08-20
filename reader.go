@@ -48,36 +48,42 @@ func NewReader(r io.Reader, sep byte, quoted, guess bool) *Reader {
 
 // ScanRecord decodes one line fields to values.
 // It's like fmt.Scan or database.sql.Rows.Scan.
-func (s *Reader) ScanRecord(values ...interface{}) error {
+func (s *Reader) ScanRecord(values ...interface{}) (int, error) {
 	for i, value := range values {
 		if !s.Scan() {
-			return s.Err()
+			return i, s.Err()
 		}
 		if i == 0 { // skip empty line (or line comment)
 			for s.EmptyLine() {
 				if !s.Scan() {
-					return s.Err()
+					return i, s.Err()
 				}
 			}
 		}
-		if err := s.scanValue(value, true); err != nil {
-			return err
+		if err := s.value(value, true); err != nil {
+			return i, err
 		} else if s.EndOfRecord() != (i == len(values)-1) {
-			return fmt.Errorf("unexpected number of fields: want %d, got %d", len(values), i+1)
+			return i, fmt.Errorf("unexpected number of fields: want %d, got %d", len(values), i+1)
 		}
 	}
-	return nil
+	return len(values), nil
 }
 
-// ScanValue decodes one field's content to value.
+// ScanValue advances to the next token and decodes field's content to value.
 // The value may point to data that will be overwritten by a subsequent call to Scan.
 func (s *Reader) ScanValue(value interface{}) error {
 	if !s.Scan() {
 		return s.Err()
 	}
-	return s.scanValue(value, false)
+	return s.value(value, false)
 }
-func (s *Reader) scanValue(value interface{}, copied bool) error {
+
+// Value decodes field's content to value.
+// The value may point to data that will be overwritten by a subsequent call to Scan.
+func (s *Reader) Value(value interface{}) error {
+	return s.value(value, false)
+}
+func (s *Reader) value(value interface{}, copied bool) error {
 	var err error
 	switch value := value.(type) {
 	case nil:

@@ -369,7 +369,13 @@ func TestScanRecord(t *testing.T) {
 	var i int
 	var f float64
 	var d time.Time
-	err := r.ScanRecord(nil, &str, &i, &f, &d)
+	n, err := r.ScanRecord(nil, &str, &i, &f, &d)
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	if n != 5 {
+		t.Errorf("want %d, got %d", 5, n)
+	}
 	if str != "nil" {
 		t.Errorf("want %s, got %s", "nil", str)
 	}
@@ -381,8 +387,5 @@ func TestScanRecord(t *testing.T) {
 	}
 	if d != time.Unix(0, 0).UTC() {
 		t.Errorf("want %v, got %v", time.Unix(0, 0).UTC(), d)
-	}
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
 	}
 }
