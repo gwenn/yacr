@@ -180,7 +180,7 @@ func (s *Reader) Sep() byte {
 // ScanField implements bufio.SplitFunc for CSV.
 // Lexing is adapted from csv_read_one_field function in SQLite3 shell sources.
 func (s *Reader) ScanField(data []byte, atEOF bool) (advance int, token []byte, err error) {
-	if atEOF && len(data) == 0 {
+	if atEOF && len(data) == 0 && s.eor {
 		return 0, nil, nil
 	}
 	if s.guess {
@@ -188,11 +188,6 @@ func (s *Reader) ScanField(data []byte, atEOF bool) (advance int, token []byte, 
 		if b := guess(data); b > 0 {
 			s.sep = b
 		}
-	}
-	shift := 0
-	if !s.eor { // s.eor should be initialized to true to make this work.
-		shift = 1
-		data = data[shift:]
 	}
 	if s.quoted && len(data) > 0 && data[0] == '"' { // quoted field (may contains separator, newline and escaped quote)
 		s.empty = false
@@ -214,13 +209,13 @@ func (s *Reader) ScanField(data []byte, atEOF bool) (advance int, token []byte, 
 			}
 			if pc == '"' && c == s.sep {
 				s.eor = false
-				return i + shift, unescapeQuotes(data[1:i-1], escapedQuotes, strict), nil
+				return i + 1, unescapeQuotes(data[1:i-1], escapedQuotes, strict), nil
 			} else if pc == '"' && c == '\n' {
 				s.eor = true
-				return i + shift + 1, unescapeQuotes(data[1:i-1], escapedQuotes, strict), nil
+				return i + 1, unescapeQuotes(data[1:i-1], escapedQuotes, strict), nil
 			} else if c == '\n' && pc == '\r' && ppc == '"' {
 				s.eor = true
-				return i + shift + 1, unescapeQuotes(data[1:i-2], escapedQuotes, strict), nil
+				return i + 1, unescapeQuotes(data[1:i-2], escapedQuotes, strict), nil
 			}
 			if pc == '"' && c != '\r' {
 				if s.Lazy {
@@ -235,7 +230,7 @@ func (s *Reader) ScanField(data []byte, atEOF bool) (advance int, token []byte, 
 		if atEOF {
 			if c == '"' {
 				s.eor = true
-				return len(data) + shift, unescapeQuotes(data[1:len(data)-1], escapedQuotes, strict), nil
+				return len(data), unescapeQuotes(data[1:len(data)-1], escapedQuotes, strict), nil
 			}
 			// If we're at EOF, we have a non-terminated field.
 			return 0, nil, fmt.Errorf("non-terminated quoted field at line %d", startLineno)
@@ -244,11 +239,11 @@ func (s *Reader) ScanField(data []byte, atEOF bool) (advance int, token []byte, 
 		s.empty = true
 		for i, c := range data {
 			if c == '\n' {
-				return i + shift + 1, nil, nil
+				return i + 1, nil, nil
 			}
 		}
 		if atEOF {
-			return len(data) + shift, nil, nil
+			return len(data), nil, nil
 		}
 	} else { // unquoted field
 		// Scan until separator or newline, marking end of field.
@@ -256,36 +251,35 @@ func (s *Reader) ScanField(data []byte, atEOF bool) (advance int, token []byte, 
 			if c == s.sep {
 				s.eor = false
 				if s.Trim {
-					return i + shift, trim(data[0:i]), nil
+					return i + 1, trim(data[0:i]), nil
 				}
-				return i + shift, data[0:i], nil
+				return i + 1, data[0:i], nil
 			} else if c == '\n' {
 				s.lineno++
 				if i > 0 && data[i-1] == '\r' {
 					s.empty = s.eor && i == 1 // FIXME empty & trim
 					s.eor = true
 					if s.Trim {
-						return i + shift + 1, trim(data[0 : i-1]), nil
+						return i + 1, trim(data[0 : i-1]), nil
 					}
-					return i + shift + 1, data[0 : i-1], nil
+					return i + 1, data[0 : i-1], nil
 				}
 				s.empty = s.eor && i == 0 // FIXME empty & trim
 				s.eor = true
 				if s.Trim {
-					return i + shift + 1, trim(data[0:i]), nil
+					return i + 1, trim(data[0:i]), nil
 				}
-				return i + shift + 1, data[0:i], nil
+				return i + 1, data[0:i], nil
 			}
 		}
-		// If we're at EOF, we have a final, non-empty field. Return it.
+		// If we're at EOF, we have a final field. Return it.
 		if atEOF {
 			s.empty = false
 			s.eor = true
 			if s.Trim {
-				l := len(data)
-				return l + shift, trim(data), nil
+				return len(data), trim(data), nil
 			}
-			return len(data) + shift, data, nil
+			return len(data), data, nil
 		}
 	}
 	// Request more data.
