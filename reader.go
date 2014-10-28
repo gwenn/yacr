@@ -63,7 +63,7 @@ func (s *Reader) ScanRecord(values ...interface{}) (int, error) {
 		if err := s.value(value, true); err != nil {
 			return i, err
 		} else if s.EndOfRecord() != (i == len(values)-1) {
-			return i, fmt.Errorf("unexpected number of fields: want %d, got %d", len(values), i+1)
+			return i, fmt.Errorf("unexpected number of fields: want %d, got %d (or more)", len(values), i+2)
 		}
 	}
 	return len(values), nil
