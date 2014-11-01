@@ -48,6 +48,7 @@ func NewReader(r io.Reader, sep byte, quoted, guess bool) *Reader {
 }
 
 var (
+	// ErrFieldCount is the error returned by ScanRecord when a record contains less/more fields than expected.
 	ErrFieldCount = errors.New("wrong number of fields in line")
 )
 
