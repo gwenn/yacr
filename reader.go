@@ -9,6 +9,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding"
+	"errors"
 	"fmt"
 	"io"
 	"reflect"
@@ -46,6 +47,10 @@ func NewReader(r io.Reader, sep byte, quoted, guess bool) *Reader {
 	return s
 }
 
+var (
+	ErrFieldCount = errors.New("wrong number of fields in line")
+)
+
 // ScanRecord decodes one line fields to values.
 // It's like fmt.Scan or database.sql.Rows.Scan.
 func (s *Reader) ScanRecord(values ...interface{}) (int, error) {
@@ -62,9 +67,18 @@ func (s *Reader) ScanRecord(values ...interface{}) (int, error) {
 		}
 		if err := s.value(value, true); err != nil {
 			return i, err
-		} else if s.EndOfRecord() != (i == len(values)-1) {
-			return i, fmt.Errorf("unexpected number of fields: want %d, got %d", len(values), i+1)
+		} else if s.EndOfRecord() && i != len(values)-1 {
+			return i, ErrFieldCount // unexpected number of fields: want len(values), got only i+1
 		}
+	}
+	if !s.EndOfRecord() {
+		i := len(values)
+		for ; !s.EndOfRecord(); i++ { // Consume extra fields
+			if !s.Scan() {
+				return i, s.Err()
+			}
+		}
+		return i - 1, ErrFieldCount // unexpected number of fields: want len(values), got i
 	}
 	return len(values), nil
 }

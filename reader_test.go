@@ -358,7 +358,7 @@ func TestRead(t *testing.T) {
 			t.Errorf("%s: unexpected error %v", tt.Name, err)
 		}
 		if tt.Guess != 0 && tt.Guess != r.Sep() {
-			t.Errorf("got '%q'; want '%q'", r.Sep(), tt.Guess)
+			t.Errorf("%s: got '%c'; want '%c'", tt.Name, r.Sep(), tt.Guess)
 		}
 	}
 }
@@ -387,5 +387,37 @@ func TestScanRecord(t *testing.T) {
 	}
 	if d != time.Unix(0, 0).UTC() {
 		t.Errorf("want %v, got %v", time.Unix(0, 0).UTC(), d)
+	}
+}
+
+var recordTests = []struct {
+	Name  string
+	Input string
+	Index int
+}{
+	{
+		Name:  "Too short line",
+		Input: "a,b,c\n",
+		Index: 2,
+	},
+	{
+		Name:  "Too long line",
+		Input: "a,b,c,d,e\n",
+		Index: 4,
+	},
+}
+
+func TestScanRecordError(t *testing.T) {
+	for _, tt := range recordTests {
+		r := DefaultReader(strings.NewReader(tt.Input))
+		n, err := r.ScanRecord(nil, nil, nil, nil)
+		if err == nil {
+			t.Errorf("%s: no error, want error %q", tt.Name, ErrFieldCount.Error())
+		} else if err != ErrFieldCount {
+			t.Errorf("%s: want error %q, got %q", tt.Name, ErrFieldCount.Error(), err.Error())
+		}
+		if n != tt.Index {
+			t.Errorf("%s: want %d, got %d", tt.Name, tt.Index, n)
+		}
 	}
 }
