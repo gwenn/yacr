@@ -1,5 +1,9 @@
 Yet another CSV reader (and writer) with small memory usage.
 
+All credit goes to:
+* Rob Pike, creator of Scanner interface,
+* D. Richard Hipp, for his CSV parser implementation.
+
 [![Build Status][1]][2]
 
 [1]: https://secure.travis-ci.org/gwenn/yacr.png
