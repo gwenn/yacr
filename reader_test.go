@@ -17,9 +17,6 @@ func TestLongLine(t *testing.T) {
 	r := NewReader(strings.NewReader(content), ',', true, false)
 	values := make([]string, 0, 10)
 	for r.Scan() {
-		if r.EmptyLine() { // skip empty line (or line comment)
-			continue
-		}
 		values = append(values, r.Text())
 		if r.EndOfRecord() {
 			break
@@ -327,7 +324,7 @@ func TestRead(t *testing.T) {
 
 		i, j := 0, 0
 		for r.Scan() {
-			if r.EmptyLine() { // skip empty line (or line comment)
+			if j == 0 && r.EndOfRecord() && len(r.Bytes()) == 0 { // skip empty lines
 				continue
 			}
 			if i >= len(tt.Output) {
@@ -353,6 +350,53 @@ func TestRead(t *testing.T) {
 				t.Errorf("%s: error %v, want error %q", tt.Name, err, tt.Error)
 			} else if tt.Line != 0 && (tt.Line != r.LineNumber() || tt.Column != j+1) {
 				t.Errorf("%s: error at %d:%d expected %d:%d", tt.Name, r.LineNumber(), j+1, tt.Line, tt.Column)
+			}
+		} else if err != nil {
+			t.Errorf("%s: unexpected error %v", tt.Name, err)
+		}
+		if tt.Guess != 0 && tt.Guess != r.Sep() {
+			t.Errorf("%s: got '%c'; want '%c'", tt.Name, r.Sep(), tt.Guess)
+		}
+	}
+}
+
+func TestReadRecord(t *testing.T) {
+	for _, tt := range readTests {
+		var sep byte = ','
+		if tt.Sep != 0 {
+			sep = tt.Sep
+		}
+		r := NewReader(strings.NewReader(tt.Input), sep, tt.Quoted, tt.Guess != 0)
+		r.Comment = tt.Comment
+		r.Trim = tt.Trim
+		r.Lazy = tt.Lazy
+
+		values := make([]string, 5)
+		i, j := 0, 0
+		var err error
+		for {
+			if j, err = r.ScanRecord(&values[0], &values[1], &values[2], &values[3], &values[4]); err != nil || j == 0 {
+				break
+			}
+			if i >= len(tt.Output) {
+				t.Errorf("%s: unexpected number of row %d; want %d max", tt.Name, i+1, len(tt.Output))
+				break
+			} else if j != len(tt.Output[i]) {
+				t.Errorf("%s: unexpected number of column %d; want %d at line %d", tt.Name, j, len(tt.Output[i]), i+1)
+				break
+			}
+			for k, value := range values[0:j] {
+				if value != tt.Output[i][k] {
+					t.Errorf("%s: unexpected value %s; want %s at line %d, column %d", tt.Name, r.Text(), tt.Output[i][j], i+1, k+1)
+				}
+			}
+			i++
+		}
+		if tt.Error != "" {
+			if err == nil || !strings.Contains(err.Error(), tt.Error) {
+				t.Errorf("%s: error %v, want error %q", tt.Name, err, tt.Error)
+			} else if tt.Line != 0 && tt.Line != r.LineNumber() {
+				t.Errorf("%s: error at %d expected %d:%d", tt.Name, r.LineNumber(), tt.Line, tt.Column)
 			}
 		} else if err != nil {
 			t.Errorf("%s: unexpected error %v", tt.Name, err)
@@ -393,17 +437,17 @@ func TestScanRecord(t *testing.T) {
 var recordTests = []struct {
 	Name  string
 	Input string
-	Index int
+	N     int
 }{
 	{
 		Name:  "Too short line",
 		Input: "a,b,c\n",
-		Index: 2,
+		N:     3,
 	},
 	{
 		Name:  "Too long line",
 		Input: "a,b,c,d,e\n",
-		Index: 4,
+		N:     5,
 	},
 }
 
@@ -411,13 +455,11 @@ func TestScanRecordError(t *testing.T) {
 	for _, tt := range recordTests {
 		r := DefaultReader(strings.NewReader(tt.Input))
 		n, err := r.ScanRecord(nil, nil, nil, nil)
-		if err == nil {
-			t.Errorf("%s: no error, want error %q", tt.Name, ErrFieldCount.Error())
-		} else if err != ErrFieldCount {
-			t.Errorf("%s: want error %q, got %q", tt.Name, ErrFieldCount.Error(), err.Error())
+		if err != nil {
+			t.Errorf("%s: error %q", tt.Name, err)
 		}
-		if n != tt.Index {
-			t.Errorf("%s: want %d, got %d", tt.Name, tt.Index, n)
+		if n != tt.N {
+			t.Errorf("%s: want %d, got %d", tt.Name, tt.N, n)
 		}
 	}
 }
