@@ -46,6 +46,7 @@ func NewReader(r io.Reader, sep byte, quoted, guess bool) *Reader {
 }
 
 // ScanRecord decodes one line fields to values.
+// Empty lines are ignored/skipped.
 // It's like fmt.Scan or database.sql.Rows.Scan.
 // Returns (0, nil) on EOF, (*, err) on error
 // and (n >= 1, nil) on success (n may be less or greater than len(values)).
@@ -196,6 +197,22 @@ func (s *Reader) EndOfRecord() bool {
 // Sep returns the values separator used/guessed
 func (s *Reader) Sep() byte {
 	return s.sep
+}
+
+// SkipRecords skips n records/headers
+func (s *Reader) SkipRecords(n int) error {
+	i := 0
+	for {
+		if i == n {
+			return nil
+		}
+		if !s.Scan() {
+			return s.Err()
+		}
+		if s.eor {
+			i++
+		}
+	}
 }
 
 // ScanField implements bufio.SplitFunc for CSV.

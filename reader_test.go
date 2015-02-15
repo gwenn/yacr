@@ -360,7 +360,7 @@ func TestRead(t *testing.T) {
 	}
 }
 
-func TestReadRecord(t *testing.T) {
+func TestScanRecord(t *testing.T) {
 	for _, tt := range readTests {
 		var sep byte = ','
 		if tt.Sep != 0 {
@@ -407,7 +407,7 @@ func TestReadRecord(t *testing.T) {
 	}
 }
 
-func TestScanRecord(t *testing.T) {
+func TestScanTypedRecord(t *testing.T) {
 	r := DefaultReader(strings.NewReader(",nil,123,3.14,1970-01-01T00:00:00Z\n"))
 	var str string
 	var i int
@@ -445,13 +445,18 @@ var recordTests = []struct {
 		N:     3,
 	},
 	{
+		Name:  "Good line",
+		Input: "a,b,c,d\n",
+		N:     4,
+	},
+	{
 		Name:  "Too long line",
 		Input: "a,b,c,d,e\n",
 		N:     5,
 	},
 }
 
-func TestScanRecordError(t *testing.T) {
+func TestScanRecordCount(t *testing.T) {
 	for _, tt := range recordTests {
 		r := DefaultReader(strings.NewReader(tt.Input))
 		n, err := r.ScanRecord(nil, nil, nil, nil)
@@ -460,6 +465,68 @@ func TestScanRecordError(t *testing.T) {
 		}
 		if n != tt.N {
 			t.Errorf("%s: want %d, got %d", tt.Name, tt.N, n)
+		}
+	}
+}
+
+var skipTests = []struct {
+	Name    string
+	Input   string
+	Output  []string
+	N       int
+	Comment byte
+}{
+	{
+		Name:   "SingleLine",
+		Input:  "a,b,c\n",
+		N:      1,
+		Output: []string{},
+	},
+	{
+		Name:   "Empty",
+		Input:  "",
+		N:      1,
+		Output: []string{},
+	},
+	{
+		Name:   "TwoLines",
+		Input:  "a,b,c\nd,e\n",
+		N:      1,
+		Output: []string{"d", "e"},
+	},
+	{
+		Name:    "Comment",
+		Input:   "#a,b,c\nd,e\n",
+		N:       1,
+		Comment: '#',
+		Output:  []string{},
+	},
+}
+
+func TestSkipRecords(t *testing.T) {
+	for _, tt := range skipTests {
+		r := DefaultReader(strings.NewReader(tt.Input))
+		r.Comment = tt.Comment
+
+		var err error
+		if err = r.SkipRecords(tt.N); err != nil {
+			t.Errorf("%s: unexpected error %v", tt.Name, err)
+		}
+
+		values := make([]string, 2)
+		j := 0
+		if j, err = r.ScanRecord(&values[0], &values[1]); err != nil {
+			t.Errorf("%s: unexpected error %v", tt.Name, err)
+			continue
+		}
+		if j != len(tt.Output) {
+			t.Errorf("%s: unexpected number of column %d; want %d", tt.Name, j, len(tt.Output))
+			continue
+		}
+		for k, value := range values[0:j] {
+			if value != tt.Output[k] {
+				t.Errorf("%s: unexpected value %s; want %s at column %d", tt.Name, r.Text(), tt.Output[j], k+1)
+			}
 		}
 	}
 }
