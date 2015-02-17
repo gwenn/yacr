@@ -28,7 +28,7 @@ type Reader struct {
 	lineno int  // current line number (not record number)
 
 	Trim    bool // trim spaces (only on unquoted values). Break rfc4180 rule: "Spaces are considered part of a field and should not be ignored."
-	Comment byte // character marking the start of a line comment. When specified, line comment appears as empty line.
+	Comment byte // character marking the start of a line comment. When specified (not 0), line comment appears as empty line.
 	Lazy    bool // specify if quoted values may contains unescaped quote not followed by a separator or a newline
 }
 
@@ -218,6 +218,18 @@ func (s *Reader) SkipRecords(n int) error {
 // ScanField implements bufio.SplitFunc for CSV.
 // Lexing is adapted from csv_read_one_field function in SQLite3 shell sources.
 func (s *Reader) ScanField(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	var a int
+	for {
+		a, token, err = s.scanField(data, atEOF)
+		advance += a
+		if err != nil || a == 0 || token != nil {
+			return
+		}
+		data = data[a:]
+	}
+}
+
+func (s *Reader) scanField(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if atEOF && len(data) == 0 && s.eor {
 		return 0, nil, nil
 	}

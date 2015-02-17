@@ -353,6 +353,8 @@ func TestRead(t *testing.T) {
 			}
 		} else if err != nil {
 			t.Errorf("%s: unexpected error %v", tt.Name, err)
+		} else if i != len(tt.Output) {
+			t.Errorf("%s: unexpected number of row %d; want %d", tt.Name, i, len(tt.Output))
 		}
 		if tt.Guess != 0 && tt.Guess != r.Sep() {
 			t.Errorf("%s: got '%c'; want '%c'", tt.Name, r.Sep(), tt.Guess)
@@ -400,6 +402,8 @@ func TestScanRecord(t *testing.T) {
 			}
 		} else if err != nil {
 			t.Errorf("%s: unexpected error %v", tt.Name, err)
+		} else if i != len(tt.Output) {
+			t.Errorf("%s: unexpected number of row %d; want %d", tt.Name, i, len(tt.Output))
 		}
 		if tt.Guess != 0 && tt.Guess != r.Sep() {
 			t.Errorf("%s: got '%c'; want '%c'", tt.Name, r.Sep(), tt.Guess)
