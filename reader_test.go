@@ -5,6 +5,7 @@
 package yacr_test
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -352,7 +353,7 @@ func TestRead(t *testing.T) {
 				t.Errorf("%s: error at %d:%d expected %d:%d", tt.Name, r.LineNumber(), j+1, tt.Line, tt.Column)
 			}
 		} else if err != nil {
-			t.Errorf("%s: unexpected error %v", tt.Name, err)
+			t.Errorf("%s: unexpected error: %v", tt.Name, err)
 		} else if i != len(tt.Output) {
 			t.Errorf("%s: unexpected number of row %d; want %d", tt.Name, i, len(tt.Output))
 		}
@@ -389,7 +390,7 @@ func TestScanRecord(t *testing.T) {
 			}
 			for k, value := range values[0:j] {
 				if value != tt.Output[i][k] {
-					t.Errorf("%s: unexpected value %s; want %s at line %d, column %d", tt.Name, r.Text(), tt.Output[i][j], i+1, k+1)
+					t.Errorf("%s: unexpected value: %s; want: %s at line %d, column %d", tt.Name, r.Text(), tt.Output[i][j], i+1, k+1)
 				}
 			}
 			i++
@@ -401,7 +402,7 @@ func TestScanRecord(t *testing.T) {
 				t.Errorf("%s: error at %d expected %d:%d", tt.Name, r.LineNumber(), tt.Line, tt.Column)
 			}
 		} else if err != nil {
-			t.Errorf("%s: unexpected error %v", tt.Name, err)
+			t.Errorf("%s: unexpected error: %v", tt.Name, err)
 		} else if i != len(tt.Output) {
 			t.Errorf("%s: unexpected number of row %d; want %d", tt.Name, i, len(tt.Output))
 		}
@@ -419,7 +420,7 @@ func TestScanTypedRecord(t *testing.T) {
 	var d time.Time
 	n, err := r.ScanRecord(nil, &str, &i, &f, &d)
 	if err != nil {
-		t.Errorf("unexpected error %v", err)
+		t.Errorf("unexpected error: %v", err)
 	}
 	if n != 5 {
 		t.Errorf("want %d, got %d", 5, n)
@@ -465,7 +466,7 @@ func TestScanRecordCount(t *testing.T) {
 		r := DefaultReader(strings.NewReader(tt.Input))
 		n, err := r.ScanRecord(nil, nil, nil, nil)
 		if err != nil {
-			t.Errorf("%s: error %q", tt.Name, err)
+			t.Errorf("%s: error: %q", tt.Name, err)
 		}
 		if n != tt.N {
 			t.Errorf("%s: want %d, got %d", tt.Name, tt.N, n)
@@ -514,13 +515,13 @@ func TestSkipRecords(t *testing.T) {
 
 		var err error
 		if err = r.SkipRecords(tt.N); err != nil {
-			t.Errorf("%s: unexpected error %v", tt.Name, err)
+			t.Errorf("%s: unexpected error: %v", tt.Name, err)
 		}
 
 		values := make([]string, 2)
 		j := 0
 		if j, err = r.ScanRecord(&values[0], &values[1]); err != nil {
-			t.Errorf("%s: unexpected error %v", tt.Name, err)
+			t.Errorf("%s: unexpected error: %v", tt.Name, err)
 			continue
 		}
 		if j != len(tt.Output) {
@@ -529,8 +530,57 @@ func TestSkipRecords(t *testing.T) {
 		}
 		for k, value := range values[0:j] {
 			if value != tt.Output[k] {
-				t.Errorf("%s: unexpected value %s; want %s at column %d", tt.Name, r.Text(), tt.Output[j], k+1)
+				t.Errorf("%s: unexpected value: %s; want: %s at column %d", tt.Name, r.Text(), tt.Output[j], k+1)
 			}
+		}
+	}
+}
+
+var fields []string = make([]string, 3)
+
+var headerTests = []struct {
+	Name    string
+	Input   string
+	Headers map[string]int
+	Args    []interface{}
+	Output  []string
+}{
+	{
+		Name:  "Simple",
+		Input: "A,B,C\na,b,c\n",
+		Headers: map[string]int{
+			"A": 1,
+			"B": 2,
+			"C": 3,
+		},
+		Args:   []interface{}{"A", &fields[0], "B", &fields[1], "C", &fields[2]},
+		Output: []string{"a", "b", "c"},
+	},
+}
+
+func TestScanRecordByName(t *testing.T) {
+	for _, tt := range headerTests {
+		r := DefaultReader(strings.NewReader(tt.Input))
+		err := r.ScanHeaders()
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", tt.Name, err)
+			continue
+		}
+		if !reflect.DeepEqual(r.Headers, tt.Headers) {
+			t.Errorf("%s: unexpected headers: %v; want: %v", tt.Name, r.Headers, tt.Headers)
+			continue
+		}
+		n, err := r.ScanRecordByName(tt.Args...)
+		if err != nil {
+			t.Errorf("%s: unexpected error: %v", tt.Name, err)
+			continue
+		}
+		if n != len(tt.Output) {
+			t.Errorf("%s: unexpected number of column %d; want %d", tt.Name, n, len(tt.Output))
+			continue
+		}
+		if !reflect.DeepEqual(tt.Output, fields) {
+			t.Errorf("%s: unexpected values: %v; want: %v", tt.Name, fields, tt.Output)
 		}
 	}
 }

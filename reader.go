@@ -30,6 +30,8 @@ type Reader struct {
 	Trim    bool // trim spaces (only on unquoted values). Break rfc4180 rule: "Spaces are considered part of a field and should not be ignored."
 	Comment byte // character marking the start of a line comment. When specified (not 0), line comment appears as empty line.
 	Lazy    bool // specify if quoted values may contains unescaped quote not followed by a separator or a newline
+
+	Headers map[string]int // Index (first is 1) by header
 }
 
 // DefaultReader creates a "standard" CSV reader (separator is comma and quoted mode active)
@@ -40,9 +42,41 @@ func DefaultReader(rd io.Reader) *Reader {
 // NewReader returns a new CSV scanner to read from r.
 // When quoted is false, values must not contain a separator or newline.
 func NewReader(r io.Reader, sep byte, quoted, guess bool) *Reader {
-	s := &Reader{bufio.NewScanner(r), sep, quoted, guess, true, 1, false, 0, false}
+	s := &Reader{bufio.NewScanner(r), sep, quoted, guess, true, 1, false, 0, false, nil}
 	s.Split(s.ScanField)
 	return s
+}
+
+// ScanHeaders loads current line as the header line.
+func (s *Reader) ScanHeaders() error {
+	s.Headers = make(map[string]int)
+	for i := 1; s.Scan(); i++ {
+		s.Headers[s.Text()] = i
+		if s.EndOfRecord() {
+			break
+		}
+	}
+	return s.Err()
+}
+
+// ScanRecordByName decodes one line fields by name (name1, value1, ...).
+func (s *Reader) ScanRecordByName(args ...interface{}) (int, error) {
+	if len(args)%2 != 0 {
+		return 0, fmt.Errorf("expected an even number of arguments: %d", len(args))
+	}
+	values := make([]interface{}, len(s.Headers))
+	for i := 0; i < len(args); i += 2 {
+		name, ok := args[i].(string)
+		if !ok {
+			return 0, fmt.Errorf("non-string field name at %d: %T", i, args[i])
+		}
+		index, ok := s.Headers[name]
+		if !ok {
+			return 0, fmt.Errorf("unknown field name: %s", name)
+		}
+		values[index-1] = args[i+1]
+	}
+	return s.ScanRecord(values...)
 }
 
 // ScanRecord decodes one line fields to values.

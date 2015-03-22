@@ -22,7 +22,7 @@ import (
 type Writer struct {
 	b      *bufio.Writer
 	sep    byte                 // values separator
-	quoted bool                 // specify if values should be quoted (when they contain a separator or a newline)
+	quoted bool                 // specify if values should be quoted (when they contain a separator, a double-quote or a newline)
 	sor    bool                 // true at start of record
 	err    error                // sticky error.
 	bs     []byte               // byte slice used to write string with minimal/no alloc/copy
