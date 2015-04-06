@@ -426,36 +426,30 @@ func IsNumber(s []byte) (isNum bool, isReal bool) {
 	i := 0
 	if s[i] == '-' || s[i] == '+' { // sign
 		i++
-		if len(s) == i {
-			return false, false
-		}
 	}
 	// Nor Hexadecimal nor octal supported
 	digit := false
 	for ; len(s) != i && isDigit(s[i]); i++ {
 		digit = true
 	}
-	if len(s) == i { // integer "[+|-]\d+"
-		return true, false
+	if len(s) == i { // integer "[-+]?\d*"
+		return digit, false
 	}
-	if s[i] == '.' { // real "[+|-]\d*."
+	if s[i] == '.' { // real
 		for i++; len(s) != i && isDigit(s[i]); i++ { // digit(s) optional
 			digit = true
 		}
 	}
-	if len(s) == i { // real "[+|-]\d*.\d*"
+	if len(s) == i { // real "[-+]?\d*\.\d*"
 		if digit {
 			return true, true
 		}
-		// "[+|-]\." is not a number
+		// "[-+]?\." is not a number
 		return false, false
 	}
-	if s[i] == 'e' || s[i] == 'E' {
-		if !digit { // "[+|-][.]e" is not a number
-			return false, false
-		}
+	if s[i] == 'e' || s[i] == 'E' { // exponent
 		i++
-		if len(s) == i { // "[+|-]\d*[.]\d*e"
+		if !digit || len(s) == i { // nor "[-+]?\.?e" nor "[-+]?\d*\.?\d*e" is a number
 			return false, false
 		}
 		if s[i] == '-' || s[i] == '+' { // sign

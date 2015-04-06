@@ -591,20 +591,18 @@ var numberTests = []struct {
 	IsNum  bool
 	IsReal bool
 }{
+	{Input: ""},
 	{Input: "-"},
 	{Input: "+"},
 	{Input: "."},
 	{Input: "-."},
 	{Input: "+."},
-	{Input: "-.e"},
-	{Input: "+.e"},
+	{Input: "-.e0"},
 	{Input: "+.e0"},
 	{Input: "+e0"},
 	{Input: ".e0"},
-	{Input: ".e"},
-	{Input: "e"},
-	{Input: "0e"},
 	{Input: "e0"},
+	{Input: "0e"},
 	{Input: "0", IsNum: true, IsReal: false},
 	{Input: "-0", IsNum: true, IsReal: false},
 	{Input: "+0", IsNum: true, IsReal: false},
@@ -625,6 +623,7 @@ var numberTests = []struct {
 	{Input: "0123456789", IsNum: true, IsReal: false},
 	{Input: "3.14", IsNum: true, IsReal: true},
 	{Input: ".314e1", IsNum: true, IsReal: true},
+	{Input: "1e10", IsNum: true, IsReal: true},
 	{Input: "1.1."},
 	{Input: "1e-"},
 }
