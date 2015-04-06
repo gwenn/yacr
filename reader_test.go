@@ -6,6 +6,7 @@ package yacr_test
 
 import (
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -581,6 +582,80 @@ func TestScanRecordByName(t *testing.T) {
 		}
 		if !reflect.DeepEqual(tt.Output, fields) {
 			t.Errorf("%s: unexpected values: %v; want: %v", tt.Name, fields, tt.Output)
+		}
+	}
+}
+
+var numberTests = []struct {
+	Input  string
+	IsNum  bool
+	IsReal bool
+}{
+	{Input: "-"},
+	{Input: "+"},
+	{Input: "."},
+	{Input: "-."},
+	{Input: "+."},
+	{Input: "-.e"},
+	{Input: "+.e"},
+	{Input: "+.e0"},
+	{Input: "+e0"},
+	{Input: ".e0"},
+	{Input: ".e"},
+	{Input: "e"},
+	{Input: "0e"},
+	{Input: "e0"},
+	{Input: "0", IsNum: true, IsReal: false},
+	{Input: "-0", IsNum: true, IsReal: false},
+	{Input: "+0", IsNum: true, IsReal: false},
+	{Input: "+0x"},
+	{Input: "0.", IsNum: true, IsReal: true},
+	{Input: "-0.", IsNum: true, IsReal: true},
+	{Input: "+0.", IsNum: true, IsReal: true},
+	{Input: "+0.x"},
+	{Input: ".0", IsNum: true, IsReal: true},
+	{Input: "-.0", IsNum: true, IsReal: true},
+	{Input: "+.0", IsNum: true, IsReal: true},
+	{Input: "+.0x"},
+	{Input: "0e0", IsNum: true, IsReal: true},
+	{Input: "0e0x"},
+	{Input: "0e-0", IsNum: true, IsReal: true},
+	{Input: "0e+0", IsNum: true, IsReal: true},
+	{Input: "0e-0."},
+	{Input: "0123456789", IsNum: true, IsReal: false},
+	{Input: "3.14", IsNum: true, IsReal: true},
+	{Input: ".314e1", IsNum: true, IsReal: true},
+	{Input: "1.1."},
+	{Input: "1e-"},
+}
+
+func TestIsNumber(t *testing.T) {
+	for _, tt := range numberTests {
+		isNum, isReal := IsNumber([]byte(tt.Input))
+		if isNum != tt.IsNum {
+			if isNum {
+				t.Errorf("%q: is not a number", tt.Input)
+			} else {
+				t.Errorf("%q: is a number", tt.Input)
+			}
+		}
+		if isReal != tt.IsReal {
+			if isReal {
+				t.Errorf("%q: is not a real", tt.Input)
+			} else {
+				t.Errorf("%q: is a real", tt.Input)
+			}
+		}
+		var err error
+		if !tt.IsReal {
+			_, err = strconv.Atoi(tt.Input)
+		} else {
+			_, err = strconv.ParseFloat(tt.Input, 64)
+		}
+		if tt.IsNum && err != nil {
+			t.Errorf("%q: unexpected error %s", tt.Input, err)
+		} else if !tt.IsNum && err == nil {
+			t.Errorf("%q: error expected", tt.Input)
 		}
 	}
 }

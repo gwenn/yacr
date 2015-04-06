@@ -408,3 +408,67 @@ func trim(s []byte) []byte {
 	}
 	return t
 }
+
+// IsNumber determines if the current token is a number or not.
+func (s *Reader) IsNumber() (isNum bool, isReal bool) {
+	return IsNumber(s.Bytes())
+}
+
+func isDigit(c byte) bool {
+	return c >= '0' && c <= '9'
+}
+
+// IsNumber determines if the string is a number or not.
+func IsNumber(s []byte) (isNum bool, isReal bool) {
+	if len(s) == 0 {
+		return false, false
+	}
+	i := 0
+	if s[i] == '-' || s[i] == '+' { // sign
+		i++
+		if len(s) == i {
+			return false, false
+		}
+	}
+	// Nor Hexadecimal nor octal supported
+	digit := false
+	for ; len(s) != i && isDigit(s[i]); i++ {
+		digit = true
+	}
+	if len(s) == i { // integer "[+|-]\d+"
+		return true, false
+	}
+	if s[i] == '.' { // real "[+|-]\d*."
+		for i++; len(s) != i && isDigit(s[i]); i++ { // digit(s) optional
+			digit = true
+		}
+	}
+	if len(s) == i { // real "[+|-]\d*.\d*"
+		if digit {
+			return true, true
+		}
+		// "[+|-]\." is not a number
+		return false, false
+	}
+	if s[i] == 'e' || s[i] == 'E' {
+		if !digit { // "[+|-][.]e" is not a number
+			return false, false
+		}
+		i++
+		if len(s) == i { // "[+|-]\d*[.]\d*e"
+			return false, false
+		}
+		if s[i] == '-' || s[i] == '+' { // sign
+			i++
+		}
+		if len(s) == i || !isDigit(s[i]) { // one digit expected
+			return false, false
+		}
+		for i++; len(s) != i && isDigit(s[i]); i++ {
+		}
+	}
+	if len(s) == i {
+		return true, true
+	}
+	return false, false
+}
