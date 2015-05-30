@@ -537,7 +537,7 @@ func TestSkipRecords(t *testing.T) {
 	}
 }
 
-var fields []string = make([]string, 3)
+var fields = make([]string, 3)
 
 var headerTests = []struct {
 	Name    string
