@@ -26,11 +26,12 @@ type Reader struct {
 	guess  bool // try to guess separator based on the file header
 	eor    bool // true when the most recent field has been terminated by a newline (not a separator).
 	lineno int  // current line number (not record number)
-	empty  bool // true when the current line is empty (or a line comment)
 
 	Trim    bool // trim spaces (only on unquoted values). Break rfc4180 rule: "Spaces are considered part of a field and should not be ignored."
-	Comment byte // character marking the start of a line comment. When specified, line comment appears as empty line.
+	Comment byte // character marking the start of a line comment. When specified (not 0), line comment appears as empty line.
 	Lazy    bool // specify if quoted values may contains unescaped quote not followed by a separator or a newline
+
+	Headers map[string]int // Index (first is 1) by header
 }
 
 // DefaultReader creates a "standard" CSV reader (separator is comma and quoted mode active)
@@ -41,30 +42,90 @@ func DefaultReader(rd io.Reader) *Reader {
 // NewReader returns a new CSV scanner to read from r.
 // When quoted is false, values must not contain a separator or newline.
 func NewReader(r io.Reader, sep byte, quoted, guess bool) *Reader {
-	s := &Reader{bufio.NewScanner(r), sep, quoted, guess, true, 1, false, false, 0, false}
+	s := &Reader{bufio.NewScanner(r), sep, quoted, guess, true, 1, false, 0, false, nil}
 	s.Split(s.ScanField)
 	return s
 }
 
+// ScanHeaders loads current line as the header line.
+func (s *Reader) ScanHeaders() error {
+	s.Headers = make(map[string]int)
+	for i := 1; s.Scan(); i++ {
+		s.Headers[s.Text()] = i
+		if s.EndOfRecord() {
+			break
+		}
+	}
+	return s.Err()
+}
+
+// ScanRecordByName decodes one line fields by name (name1, value1, ...).
+func (s *Reader) ScanRecordByName(args ...interface{}) (int, error) {
+	if len(args)%2 != 0 {
+		return 0, fmt.Errorf("expected an even number of arguments: %d", len(args))
+	}
+	values := make([]interface{}, len(s.Headers))
+	for i := 0; i < len(args); i += 2 {
+		name, ok := args[i].(string)
+		if !ok {
+			return 0, fmt.Errorf("non-string field name at %d: %T", i, args[i])
+		}
+		index, ok := s.Headers[name]
+		if !ok {
+			return 0, fmt.Errorf("unknown field name: %s", name)
+		}
+		values[index-1] = args[i+1]
+	}
+	return s.ScanRecord(values...)
+}
+
 // ScanRecord decodes one line fields to values.
+// Empty lines are ignored/skipped.
 // It's like fmt.Scan or database.sql.Rows.Scan.
+// Returns (0, nil) on EOF, (*, err) on error
+// and (n >= 1, nil) on success (n may be less or greater than len(values)).
+//   var n int
+//   var err error
+//   for {
+//     values := make([]string, N)
+//     if n, err = s.ScanRecord(&values[0]/*, &values[1], ...*/); err != nil || n == 0 {
+//       break // or error handling
+//     } else if (n > N) {
+//       n = N
+//   	 }
+//     for _, value := range values[0:n] {
+//       // ...
+//     }
+//	 }
+//   if err != nil {
+//     // error handling
+//   }
 func (s *Reader) ScanRecord(values ...interface{}) (int, error) {
 	for i, value := range values {
 		if !s.Scan() {
 			return i, s.Err()
 		}
 		if i == 0 { // skip empty line (or line comment)
-			for s.EmptyLine() {
+			for s.EndOfRecord() && len(s.Bytes()) == 0 {
 				if !s.Scan() {
 					return i, s.Err()
 				}
 			}
 		}
 		if err := s.value(value, true); err != nil {
-			return i, err
-		} else if s.EndOfRecord() != (i == len(values)-1) {
-			return i, fmt.Errorf("unexpected number of fields: want %d, got %d (or more)", len(values), i+2)
+			return i + 1, err
+		} else if s.EndOfRecord() && i != len(values)-1 {
+			return i + 1, nil
 		}
+	}
+	if !s.EndOfRecord() {
+		i := len(values)
+		for ; !s.EndOfRecord(); i++ { // Consume extra fields
+			if !s.Scan() {
+				return i, s.Err()
+			}
+		}
+		return i, nil
 	}
 	return len(values), nil
 }
@@ -167,19 +228,42 @@ func (s *Reader) EndOfRecord() bool {
 	return s.eor
 }
 
-// EmptyLine returns true when the current line is empty or a line comment.
-func (s *Reader) EmptyLine() bool {
-	return s.empty && s.eor
-}
-
 // Sep returns the values separator used/guessed
 func (s *Reader) Sep() byte {
 	return s.sep
 }
 
+// SkipRecords skips n records/headers
+func (s *Reader) SkipRecords(n int) error {
+	i := 0
+	for {
+		if i == n {
+			return nil
+		}
+		if !s.Scan() {
+			return s.Err()
+		}
+		if s.eor {
+			i++
+		}
+	}
+}
+
 // ScanField implements bufio.SplitFunc for CSV.
 // Lexing is adapted from csv_read_one_field function in SQLite3 shell sources.
 func (s *Reader) ScanField(data []byte, atEOF bool) (advance int, token []byte, err error) {
+	var a int
+	for {
+		a, token, err = s.scanField(data, atEOF)
+		advance += a
+		if err != nil || a == 0 || token != nil {
+			return
+		}
+		data = data[a:]
+	}
+}
+
+func (s *Reader) scanField(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	if atEOF && len(data) == 0 && s.eor {
 		return 0, nil, nil
 	}
@@ -190,7 +274,6 @@ func (s *Reader) ScanField(data []byte, atEOF bool) (advance int, token []byte, 
 		}
 	}
 	if s.quoted && len(data) > 0 && data[0] == '"' { // quoted field (may contains separator, newline and escaped quote)
-		s.empty = false
 		startLineno := s.lineno
 		escapedQuotes := 0
 		strict := true
@@ -236,9 +319,9 @@ func (s *Reader) ScanField(data []byte, atEOF bool) (advance int, token []byte, 
 			return 0, nil, fmt.Errorf("non-terminated quoted field at line %d", startLineno)
 		}
 	} else if s.eor && s.Comment != 0 && len(data) > 0 && data[0] == s.Comment { // line comment
-		s.empty = true
 		for i, c := range data {
 			if c == '\n' {
+				s.lineno++
 				return i + 1, nil, nil
 			}
 		}
@@ -257,14 +340,12 @@ func (s *Reader) ScanField(data []byte, atEOF bool) (advance int, token []byte, 
 			} else if c == '\n' {
 				s.lineno++
 				if i > 0 && data[i-1] == '\r' {
-					s.empty = s.eor && i == 1 // FIXME empty & trim
 					s.eor = true
 					if s.Trim {
 						return i + 1, trim(data[0 : i-1]), nil
 					}
 					return i + 1, data[0 : i-1], nil
 				}
-				s.empty = s.eor && i == 0 // FIXME empty & trim
 				s.eor = true
 				if s.Trim {
 					return i + 1, trim(data[0:i]), nil
@@ -274,7 +355,6 @@ func (s *Reader) ScanField(data []byte, atEOF bool) (advance int, token []byte, 
 		}
 		// If we're at EOF, we have a final field. Return it.
 		if atEOF {
-			s.empty = false
 			s.eor = true
 			if s.Trim {
 				return len(data), trim(data), nil
@@ -327,4 +407,62 @@ func trim(s []byte) []byte {
 		return s[0:0]
 	}
 	return t
+}
+
+// IsNumber determines if the current token is a number or not.
+func (s *Reader) IsNumber() (isNum bool, isReal bool) {
+	return IsNumber(s.Bytes())
+}
+
+func isDigit(c byte) bool {
+	return c >= '0' && c <= '9'
+}
+
+// IsNumber determines if the string is a number or not.
+func IsNumber(s []byte) (isNum bool, isReal bool) {
+	if len(s) == 0 {
+		return false, false
+	}
+	i := 0
+	if s[i] == '-' || s[i] == '+' { // sign
+		i++
+	}
+	// Nor Hexadecimal nor octal supported
+	digit := false
+	for ; len(s) != i && isDigit(s[i]); i++ {
+		digit = true
+	}
+	if len(s) == i { // integer "[-+]?\d*"
+		return digit, false
+	}
+	if s[i] == '.' { // real
+		for i++; len(s) != i && isDigit(s[i]); i++ { // digit(s) optional
+			digit = true
+		}
+	}
+	if len(s) == i { // real "[-+]?\d*\.\d*"
+		if digit {
+			return true, true
+		}
+		// "[-+]?\." is not a number
+		return false, false
+	}
+	if s[i] == 'e' || s[i] == 'E' { // exponent
+		i++
+		if !digit || len(s) == i { // nor "[-+]?\.?e" nor "[-+]?\d*\.?\d*e" is a number
+			return false, false
+		}
+		if s[i] == '-' || s[i] == '+' { // sign
+			i++
+		}
+		if len(s) == i || !isDigit(s[i]) { // one digit expected
+			return false, false
+		}
+		for i++; len(s) != i && isDigit(s[i]); i++ {
+		}
+	}
+	if len(s) == i {
+		return true, true
+	}
+	return false, false
 }
