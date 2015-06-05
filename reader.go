@@ -92,11 +92,11 @@ func (s *Reader) ScanRecordByName(args ...interface{}) (int, error) {
 //       break // or error handling
 //     } else if (n > N) {
 //       n = N
-//   	 }
+//     }
 //     for _, value := range values[0:n] {
 //       // ...
 //     }
-//	 }
+//   }
 //   if err != nil {
 //     // error handling
 //   }
