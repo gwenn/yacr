@@ -4,3 +4,7 @@ _testmain.go
 _obj
 _test
 *.swp
+fuzz/corpus
+fuzz/crashers
+fuzz/suppressions
+fuzz/csv-fuzz.zip
