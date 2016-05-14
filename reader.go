@@ -60,6 +60,7 @@ func (s *Reader) ScanHeaders() error {
 }
 
 // ScanRecordByName decodes one line fields by name (name1, value1, ...).
+// Specified names must match Headers.
 func (s *Reader) ScanRecordByName(args ...interface{}) (int, error) {
 	if len(args)%2 != 0 {
 		return 0, fmt.Errorf("expected an even number of arguments: %d", len(args))
@@ -91,7 +92,7 @@ func (s *Reader) ScanRecordByName(args ...interface{}) (int, error) {
 //     if n, err = s.ScanRecord(&values[0]/*, &values[1], ...*/); err != nil || n == 0 {
 //       break // or error handling
 //     } else if (n > N) {
-//       n = N
+//       n = N // ignore extra values
 //     }
 //     for _, value := range values[0:n] {
 //       // ...
@@ -316,7 +317,7 @@ func (s *Reader) scanField(data []byte, atEOF bool) (advance int, token []byte, 
 				return len(data), unescapeQuotes(data[1:len(data)-1], escapedQuotes, strict), nil
 			}
 			// If we're at EOF, we have a non-terminated field.
-			return 0, nil, fmt.Errorf("non-terminated quoted field at line %d", startLineno)
+			return 0, nil, fmt.Errorf("non-terminated quoted field between lines %d and %d", startLineno, s.lineno)
 		}
 	} else if s.eor && s.Comment != 0 && len(data) > 0 && data[0] == s.Comment { // line comment
 		for i, c := range data {
@@ -410,15 +411,18 @@ func trim(s []byte) []byte {
 }
 
 // IsNumber determines if the current token is a number or not.
+// Only works for single-byte encodings (ASCII, ISO-8859-1) and UTF-8.
 func (s *Reader) IsNumber() (isNum bool, isReal bool) {
 	return IsNumber(s.Bytes())
 }
 
+// Only works for single-byte encodings (ASCII, ISO-8859-1) and UTF-8.
 func isDigit(c byte) bool {
 	return c >= '0' && c <= '9'
 }
 
 // IsNumber determines if the string is a number or not.
+// Only works for single-byte encodings (ASCII, ISO-8859-1) and UTF-8.
 func IsNumber(s []byte) (isNum bool, isReal bool) {
 	if len(s) == 0 {
 		return false, false
