@@ -1,3 +1,31 @@
+Changes from parent repo is the following
+=====
+
+    > diff -ru ../../gwenn/yacr/reader.go reader.go
+    --- ../../gwenn/yacr/reader.go  2014-10-27 21:40:04.000000000 -0700
+    +++ reader.go   2014-11-01 14:41:48.000000000 -0700
+    @@ -6,10 +6,10 @@
+     package yacr
+
+     import (
+    -   "bufio"
+        "bytes"
+        "encoding"
+        "fmt"
+    +   "github.com/harikb/bufio"
+        "io"
+        "reflect"
+        "strconv"
+    @@ -63,7 +63,7 @@
+            if err := s.value(value, true); err != nil {
+                return i, err
+            } else if s.EndOfRecord() != (i == len(values)-1) {
+    -           return i, fmt.Errorf("unexpected number of fields: want %d, got %d", len(values), i+1)
+    +           return i, fmt.Errorf("unexpected number of fields: want %d, got %d (or more)", len(values), i+2)
+            }
+        }
+        return len(values), nil
+
 Yet another CSV reader (and writer) with small memory usage.
 
 All credit goes to:

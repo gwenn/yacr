@@ -6,10 +6,10 @@
 package yacr
 
 import (
-	"bufio"
 	"bytes"
 	"encoding"
 	"fmt"
+	"github.com/harikb/bufio"
 	"io"
 	"reflect"
 	"strconv"
