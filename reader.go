@@ -285,7 +285,7 @@ func (s *Reader) scanField(data []byte, atEOF bool) (advance int, token []byte, 
 			if c == '\n' {
 				s.lineno++
 			} else if c == '"' {
-				if pc == c { // escaped quote
+				if pc == c || pc == '\\' { // escaped quote
 					pc = 0
 					escapedQuotes++
 					continue
@@ -372,10 +372,10 @@ func unescapeQuotes(b []byte, count int, strict bool) []byte {
 		return b
 	}
 	for i, j := 0, 0; i < len(b); i, j = i+1, j+1 {
-		b[j] = b[i]
-		if b[i] == '"' && (strict || i < len(b)-1 && b[i+1] == '"') {
+		if (b[i] == '"' || b[i] == '\\') && (strict || i < len(b)-1 && b[i+1] == '"') {
 			i++
 		}
+		b[j] = b[i]
 	}
 	return b[:len(b)-count]
 }
