@@ -131,6 +131,42 @@ func (s *Reader) ScanRecord(values ...interface{}) (int, error) {
 	return len(values), nil
 }
 
+// StructScanRecord decodes struct values.
+func (s *Reader) StructScanRecord(model interface{}) (error) {
+	v := reflect.ValueOf(model)
+	if v.Kind() != reflect.Ptr {
+		return fmt.Errorf("must pass a pointer, not a value, to StructScan destination") // @todo add new error message
+	}
+
+	v = reflect.Indirect(v)
+	i := 0
+	for {
+
+		if !s.Scan() {
+			return  s.Err()
+		}
+		if i == 0 { // skip empty line (or line comment)
+			for s.EndOfRecord() && len(s.Bytes()) == 0 {
+				if !s.Scan() {
+					return  s.Err()
+				}
+			}
+		}
+		if v.Field(i).CanSet() {
+			err := reflectValue(v.Field(i), s.Text())
+			if err != nil {
+				return err
+			}
+		}
+		if s.EndOfRecord() {
+			break
+		}
+		i++
+	}
+
+	return  nil
+}
+
 // ScanValue advances to the next token and decodes field's content to value.
 // The value may point to data that will be overwritten by a subsequent call to Scan.
 func (s *Reader) ScanValue(value interface{}) error {
@@ -145,6 +181,7 @@ func (s *Reader) ScanValue(value interface{}) error {
 func (s *Reader) Value(value interface{}) error {
 	return s.value(value, false)
 }
+
 func (s *Reader) value(value interface{}, copied bool) error {
 	var err error
 	switch value := value.(type) {
@@ -186,37 +223,42 @@ func (s *Reader) scanReflect(v interface{}) (err error) {
 		return fmt.Errorf("unsupported type %T", v)
 	}
 	dv := reflect.Indirect(rv)
+	return reflectValue(dv, s.Text())
+
+}
+
+func reflectValue(dv reflect.Value, t string) (err error) {
 	switch dv.Kind() {
 	case reflect.String:
-		dv.SetString(s.Text())
+		dv.SetString(t)
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		var i int64
-		i, err = strconv.ParseInt(s.Text(), 10, dv.Type().Bits())
+		i, err = strconv.ParseInt(t, 10, dv.Type().Bits())
 		if err == nil {
 			dv.SetInt(i)
 		}
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
 		var i uint64
-		i, err = strconv.ParseUint(s.Text(), 10, dv.Type().Bits())
+		i, err = strconv.ParseUint(t, 10, dv.Type().Bits())
 		if err == nil {
 			dv.SetUint(i)
 		}
 	case reflect.Bool:
 		var b bool
-		b, err = strconv.ParseBool(s.Text())
+		b, err = strconv.ParseBool(t)
 		if err == nil {
 			dv.SetBool(b)
 		}
 	case reflect.Float32, reflect.Float64:
 		var f float64
-		f, err = strconv.ParseFloat(s.Text(), dv.Type().Bits())
+		f, err = strconv.ParseFloat(t, dv.Type().Bits())
 		if err == nil {
 			dv.SetFloat(f)
 		}
 	default:
-		return fmt.Errorf("unsupported type: %T", v)
+		return fmt.Errorf("unsupported type: %T", dv.Type())
 	}
-	return
+	return nil
 }
 
 // LineNumber returns current line number (not record number)
