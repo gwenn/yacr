@@ -103,11 +103,12 @@ func ExampleReader_ScanStructRecord() {
 			fmt.Println(err)
 			break
 		}
-		fmt.Println(myRecord)
 		lineNumber++
 		if lineNumber == r.LineNumber() {
 			break
 		}
+		fmt.Println(myRecord)
+
 	}
 	fmt.Print("]")
 	// Output: [{mystring 12 1.3 true}
