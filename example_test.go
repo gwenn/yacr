@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	yacr "github.com/kmcrawford/yacr"
+	yacr "github.com/gwenn/yacr"
 )
 
 func Example() {
