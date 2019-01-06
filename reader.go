@@ -132,23 +132,27 @@ func (s *Reader) ScanRecord(values ...interface{}) (int, error) {
 }
 
 // StructScanRecord decodes struct values.
-func (s *Reader) StructScanRecord(model interface{}) (error) {
+func (s *Reader) StructScanRecord(model interface{}) error {
 	v := reflect.ValueOf(model)
 	if v.Kind() != reflect.Ptr {
 		return fmt.Errorf("must pass a pointer, not a value, to StructScan destination") // @todo add new error message
 	}
-
 	v = reflect.Indirect(v)
 	i := 0
 	for {
 
 		if !s.Scan() {
-			return  s.Err()
+			return s.Err()
 		}
+
+		if i >= v.NumField() {
+			break
+		}
+
 		if i == 0 { // skip empty line (or line comment)
 			for s.EndOfRecord() && len(s.Bytes()) == 0 {
 				if !s.Scan() {
-					return  s.Err()
+					return s.Err()
 				}
 			}
 		}
@@ -164,7 +168,7 @@ func (s *Reader) StructScanRecord(model interface{}) (error) {
 		i++
 	}
 
-	return  nil
+	return nil
 }
 
 // ScanValue advances to the next token and decodes field's content to value.
