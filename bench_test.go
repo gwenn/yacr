@@ -54,6 +54,7 @@ func BenchmarkStdParser(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		r := csv.NewReader(strings.NewReader(s))
 		//r.TrailingComma = true
+		r.ReuseRecord = true
 		nb := 0
 		for {
 			_, err := r.Read()
