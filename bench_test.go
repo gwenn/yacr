@@ -123,7 +123,7 @@ func BenchmarkStdWriter(b *testing.B) {
 	b.StartTimer()
 	w := csv.NewWriter(out)
 	for i := 0; i < b.N; i++ {
-		w.Write(row)
+		_ = w.Write(row)
 		w.Flush()
 		if err := w.Error(); err != nil {
 			b.Fatal(err)

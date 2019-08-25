@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	yacr "github.com/gwenn/yacr"
+	"github.com/gwenn/yacr"
 )
 
 func Example() {
@@ -19,10 +19,10 @@ func Example() {
 	}
 	w.Flush()
 	if err := r.Err(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		_, _ = fmt.Fprintln(os.Stderr, err)
 	}
 	if err := w.Err(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		_, _ = fmt.Fprintln(os.Stderr, err)
 	}
 }
 
@@ -96,7 +96,7 @@ func Example_writer() {
 	}
 	w.Flush()
 	if err := w.Err(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		_, _ = fmt.Fprintln(os.Stderr, err)
 	}
 	// Output: c1,"c""2","c
 	// 3","c,4"
