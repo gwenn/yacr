@@ -67,7 +67,7 @@ func TestWrite(t *testing.T) {
 
 type errorWriter struct{}
 
-func (e errorWriter) Write(b []byte) (int, error) {
+func (e errorWriter) Write(_ []byte) (int, error) {
 	return 0, errors.New("test")
 }
 
