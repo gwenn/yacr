@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package yacr_test
+package yacr
 
 import (
 	"reflect"
@@ -10,8 +10,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	. "github.com/gwenn/yacr"
 )
 
 func TestLongLine(t *testing.T) {
@@ -410,6 +408,35 @@ func TestScanRecord(t *testing.T) {
 		if tt.Guess != 0 && tt.Guess != r.Sep() {
 			t.Errorf("%s: got '%c'; want '%c'", tt.Name, r.Sep(), tt.Guess)
 		}
+	}
+}
+
+func TestStructScanRecord(t *testing.T) {
+	type testStruct struct {
+		IntValue    int
+		FloatValue  float32
+		BoolValue   bool
+		StringValue string
+	}
+	content := "1,1.1,true,test,extra"
+	r := NewReader(strings.NewReader(content), ',', true, false)
+	testData := testStruct{}
+	err := r.StructScanRecord(&testData)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if testData.IntValue != 1 {
+		t.Errorf("unexpected value for int %d", testData.IntValue)
+	}
+	if testData.FloatValue != 1.1 {
+		t.Errorf("unexpected value for float %f", testData.FloatValue)
+	}
+	if testData.BoolValue != true {
+		t.Errorf("unexpected value for bool %t", testData.BoolValue)
+	}
+	if testData.StringValue != "test" {
+		t.Errorf("unexpected value for string %s", testData.StringValue)
 	}
 }
 
