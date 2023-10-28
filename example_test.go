@@ -87,6 +87,37 @@ func ExampleReader_ScanRecord() {
 	// ]
 }
 
+func ExampleReader_ScanStructRecord() {
+	r := yacr.NewReader(strings.NewReader("mystring,12,1.3,true\nmystring2,13,1.4,false\nmystring3,14,1.4,true"), ',', true, false)
+	fmt.Print("[")
+	type testStruct struct {
+		StringValue string
+		IntValue    int
+		FloatValue  float32
+		BoolValue   bool
+	}
+	lineNumber := 0
+	for {
+		myRecord := testStruct{}
+		if err := r.StructScanRecord(&myRecord); err != nil {
+			fmt.Println(err)
+			break
+		}
+
+		fmt.Println(myRecord)
+		lineNumber++
+		if lineNumber == r.LineNumber() {
+			break
+		}
+
+	}
+	fmt.Print("]")
+	// Output: [{mystring 12 1.3 true}
+	//{mystring2 13 1.4 false}
+	//{mystring3 14 1.4 true}
+	//]
+}
+
 func Example_writer() {
 	w := yacr.DefaultWriter(os.Stdout)
 	for _, field := range []string{"c1", "c\"2", "c\n3", "c,4"} {
